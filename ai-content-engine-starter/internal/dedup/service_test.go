@@ -122,3 +122,15 @@ func TestIsDuplicateValidationAndErrors(t *testing.T) {
 		t.Fatalf("expected repository error")
 	}
 }
+
+func TestIsDuplicateRejectsNilServiceOrRepo(t *testing.T) {
+	var nilService *Service
+	if _, err := nilService.IsDuplicate(context.Background(), domain.SourceItem{SourceID: 1, ExternalID: "id"}); err == nil {
+		t.Fatalf("expected error for nil service")
+	}
+
+	svc := &Service{limit: 10}
+	if _, err := svc.IsDuplicate(context.Background(), domain.SourceItem{SourceID: 1, ExternalID: "id"}); err == nil {
+		t.Fatalf("expected error for nil repository")
+	}
+}

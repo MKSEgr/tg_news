@@ -29,6 +29,12 @@ func New(repo domain.SourceItemRepository, recentLimit int) (*Service, error) {
 
 // IsDuplicate reports whether the given item already exists among recent source items.
 func (s *Service) IsDuplicate(ctx context.Context, item domain.SourceItem) (bool, error) {
+	if s == nil {
+		return false, fmt.Errorf("dedup service is nil")
+	}
+	if s.repo == nil {
+		return false, fmt.Errorf("source item repository is nil")
+	}
 	if ctx == nil {
 		return false, fmt.Errorf("context is nil")
 	}

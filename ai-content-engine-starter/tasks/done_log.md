@@ -28,3 +28,4 @@
 - MVP-018 completed: implemented Product Hunt collector with endpoint validation, optional endpoint-driven auth headers/token, JSON parsing, and source item mapping.
 - MVP-019 completed: added normalizer service for canonical URL and text normalization with validation and unit tests.
 - MVP-020 completed: added dedup service with recent-item checks (external_id/url/title), validation, and unit tests.
+- MVP-021 completed: added trend scorer service with recency+keyword scoring and unit tests.

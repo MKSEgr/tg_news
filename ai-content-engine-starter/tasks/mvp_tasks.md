@@ -20,7 +20,7 @@
 - [x] MVP-018 Implement Product Hunt collector
 - [x] MVP-019 Implement normalizer
 - [x] MVP-020 Implement dedup
-- [ ] MVP-021 Implement trend scorer
+- [x] MVP-021 Implement trend scorer
 - [ ] MVP-022 Implement channel router
 - [ ] MVP-023 Implement Yandex AI client
 - [ ] MVP-024 Implement content generator
