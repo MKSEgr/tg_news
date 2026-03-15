@@ -2,7 +2,7 @@
 
 - [x] MVP-001 Create project skeleton
 - [x] MVP-002 Add config loader
-- [ ] MVP-003 Add structured logger
+- [x] MVP-003 Add structured logger
 - [ ] MVP-004 Add graceful shutdown
 - [ ] MVP-005 Add HTTP server with /health
 - [ ] MVP-006 Add PostgreSQL bootstrap

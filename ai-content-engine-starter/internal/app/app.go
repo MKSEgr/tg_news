@@ -1,10 +1,16 @@
 package app
 
-import "ai-content-engine-starter/internal/platform/config"
+import (
+	"log/slog"
+
+	"ai-content-engine-starter/internal/platform/config"
+	"ai-content-engine-starter/internal/platform/logger"
+)
 
 // App is the top-level application entry point.
 type App struct {
-	cfg config.Config
+	cfg    config.Config
+	logger *slog.Logger
 }
 
 // New creates a new application instance.
@@ -14,10 +20,14 @@ func New() (*App, error) {
 		return nil, err
 	}
 
-	return &App{cfg: cfg}, nil
+	return &App{
+		cfg:    cfg,
+		logger: logger.New(cfg.AppEnv),
+	}, nil
 }
 
 // Run starts the application lifecycle.
 func (a *App) Run() error {
+	a.logger.Info("application started", "app_env", a.cfg.AppEnv, "http_port", a.cfg.HTTPPort)
 	return nil
 }
