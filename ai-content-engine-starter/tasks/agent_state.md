@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: MVP
-CURRENT_TASK: MVP-001
-CURRENT_TASK_TITLE: Create project skeleton
+CURRENT_TASK: MVP-012
+CURRENT_TASK_TITLE: Implement PostgreSQL repositories
 STATUS: pending
 
-LAST_COMPLETED_TASK:
-LAST_COMPLETED_AT:
+LAST_COMPLETED_TASK: MVP-011
+LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: MVP-002 Add config loader
+NEXT_TASK_HINT: MVP-013 Implement source/channel seed logic
 
 RULES:
 - execute only CURRENT_TASK
