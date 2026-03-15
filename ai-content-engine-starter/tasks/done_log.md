@@ -13,3 +13,4 @@
 - MVP-003 completed: added structured JSON logger with environment-based log level and app startup log.
 - MVP-004 completed: added graceful shutdown handling for SIGINT/SIGTERM in app lifecycle.
 - MVP-005 completed: added HTTP server startup/shutdown flow and /health endpoint returning status ok.
+- MVP-006 completed: added PostgreSQL DSN config requirement and bootstrap validation package.

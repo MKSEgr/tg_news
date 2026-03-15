@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -13,15 +14,17 @@ const (
 
 // Config contains application runtime settings loaded from environment.
 type Config struct {
-	AppEnv   string
-	HTTPPort int
+	AppEnv      string
+	HTTPPort    int
+	PostgresDSN string
 }
 
 // Load reads configuration from environment variables and applies defaults.
 func Load() (Config, error) {
 	cfg := Config{
-		AppEnv:   getEnvOrDefault("APP_ENV", defaultAppEnv),
-		HTTPPort: defaultHTTPPort,
+		AppEnv:      getEnvOrDefault("APP_ENV", defaultAppEnv),
+		HTTPPort:    defaultHTTPPort,
+		PostgresDSN: strings.TrimSpace(os.Getenv("POSTGRES_DSN")),
 	}
 
 	if rawPort := os.Getenv("HTTP_PORT"); rawPort != "" {
@@ -33,6 +36,10 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("HTTP_PORT out of range: %d", port)
 		}
 		cfg.HTTPPort = port
+	}
+
+	if cfg.PostgresDSN == "" {
+		return Config{}, fmt.Errorf("POSTGRES_DSN is required")
 	}
 
 	return cfg, nil

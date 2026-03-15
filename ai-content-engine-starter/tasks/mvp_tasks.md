@@ -5,7 +5,7 @@
 - [x] MVP-003 Add structured logger
 - [x] MVP-004 Add graceful shutdown
 - [x] MVP-005 Add HTTP server with /health
-- [ ] MVP-006 Add PostgreSQL bootstrap
+- [x] MVP-006 Add PostgreSQL bootstrap
 - [ ] MVP-007 Add Redis bootstrap
 - [ ] MVP-008 Add Docker Compose
 - [ ] MVP-009 Add initial migrations

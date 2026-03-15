@@ -13,6 +13,7 @@ import (
 
 	"ai-content-engine-starter/internal/platform/config"
 	"ai-content-engine-starter/internal/platform/logger"
+	"ai-content-engine-starter/internal/platform/postgres"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -28,6 +29,9 @@ func New() (*App, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, err
+	}
+	if err := postgres.ValidateDSN(cfg.PostgresDSN); err != nil {
+		return nil, fmt.Errorf("validate postgres dsn: %w", err)
 	}
 
 	return &App{
