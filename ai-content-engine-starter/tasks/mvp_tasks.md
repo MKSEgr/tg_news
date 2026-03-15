@@ -8,7 +8,7 @@
 - [x] MVP-006 Add PostgreSQL bootstrap
 - [x] MVP-007 Add Redis bootstrap
 - [x] MVP-008 Add Docker Compose
-- [ ] MVP-009 Add initial migrations
+- [x] MVP-009 Add initial migrations
 - [ ] MVP-010 Implement domain models
 - [ ] MVP-011 Implement repository interfaces
 - [ ] MVP-012 Implement PostgreSQL repositories

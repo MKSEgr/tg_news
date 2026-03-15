@@ -16,3 +16,4 @@
 - MVP-006 completed: added PostgreSQL DSN config requirement and bootstrap validation package.
 - MVP-007 completed: added Redis address config requirement and bootstrap validation package.
 - MVP-008 completed: added Docker Compose for app, PostgreSQL, and Redis with healthchecks.
+- MVP-009 completed: added initial PostgreSQL SQL migrations for channels, sources, source items, and drafts.

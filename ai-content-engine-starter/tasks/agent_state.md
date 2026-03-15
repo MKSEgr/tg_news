@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: MVP
-CURRENT_TASK: MVP-009
-CURRENT_TASK_TITLE: Add initial migrations
+CURRENT_TASK: MVP-010
+CURRENT_TASK_TITLE: Implement domain models
 STATUS: pending
 
-LAST_COMPLETED_TASK: MVP-008
+LAST_COMPLETED_TASK: MVP-009
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: MVP-010 Implement domain models
+NEXT_TASK_HINT: MVP-011 Implement repository interfaces
 
 RULES:
 - execute only CURRENT_TASK
