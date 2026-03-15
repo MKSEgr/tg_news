@@ -1,21 +1,21 @@
 # MVP Tasks
 
-- [ ] MVP-001 Create project skeleton
-- [ ] MVP-002 Add config loader
-- [ ] MVP-003 Add structured logger
-- [ ] MVP-004 Add graceful shutdown
-- [ ] MVP-005 Add HTTP server with /health
-- [ ] MVP-006 Add PostgreSQL bootstrap
-- [ ] MVP-007 Add Redis bootstrap
-- [ ] MVP-008 Add Docker Compose
-- [ ] MVP-009 Add initial migrations
-- [ ] MVP-010 Implement domain models
-- [ ] MVP-011 Implement repository interfaces
-- [ ] MVP-012 Implement PostgreSQL repositories
-- [ ] MVP-013 Implement source/channel seed logic
-- [ ] MVP-014 Implement collector framework
-- [ ] MVP-015 Implement RSS collector
-- [ ] MVP-016 Implement GitHub collector
+- [x] MVP-001 Create project skeleton
+- [x] MVP-002 Add config loader
+- [x] MVP-003 Add structured logger
+- [x] MVP-004 Add graceful shutdown
+- [x] MVP-005 Add HTTP server with /health
+- [x] MVP-006 Add PostgreSQL bootstrap
+- [x] MVP-007 Add Redis bootstrap
+- [x] MVP-008 Add Docker Compose
+- [x] MVP-009 Add initial migrations
+- [x] MVP-010 Implement domain models
+- [x] MVP-011 Implement repository interfaces
+- [x] MVP-012 Implement PostgreSQL repositories
+- [x] MVP-013 Implement source/channel seed logic
+- [x] MVP-014 Implement collector framework
+- [x] MVP-015 Implement RSS collector
+- [x] MVP-016 Implement GitHub collector
 - [ ] MVP-017 Implement Reddit collector
 - [ ] MVP-018 Implement Product Hunt collector
 - [ ] MVP-019 Implement normalizer
