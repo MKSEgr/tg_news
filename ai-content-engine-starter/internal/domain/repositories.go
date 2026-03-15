@@ -42,3 +42,9 @@ type TopicMemoryRepository interface {
 	UpsertMention(ctx context.Context, memory TopicMemory) (TopicMemory, error)
 	ListTopByChannel(ctx context.Context, channelID int64, limit int) ([]TopicMemory, error)
 }
+
+// ContentRuleRepository defines persistence operations for blacklist/whitelist rules.
+type ContentRuleRepository interface {
+	Create(ctx context.Context, rule ContentRule) (ContentRule, error)
+	ListEnabled(ctx context.Context, channelID *int64) ([]ContentRule, error)
+}

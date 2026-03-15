@@ -15,6 +15,7 @@ func TestRepositoriesImplementDomainInterfaces(t *testing.T) {
 	var _ domain.SourceItemRepository = (*SourceItemRepository)(nil)
 	var _ domain.DraftRepository = (*DraftRepository)(nil)
 	var _ domain.TopicMemoryRepository = (*TopicMemoryRepository)(nil)
+	var _ domain.ContentRuleRepository = (*ContentRuleRepository)(nil)
 }
 
 func TestListBySourceIDRejectsInvalidLimit(t *testing.T) {
@@ -66,5 +67,16 @@ func TestUpsertMentionRejectsInvalidInput(t *testing.T) {
 		if _, err := repo.UpsertMention(context.Background(), item); err == nil {
 			t.Fatalf("UpsertMention expected validation error")
 		}
+	}
+}
+
+func TestContentRuleRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewContentRuleRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.ContentRule{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	invalidChannel := int64(0)
+	if _, err := repo.ListEnabled(context.Background(), &invalidChannel); err == nil {
+		t.Fatalf("ListEnabled expected channel validation error")
 	}
 }

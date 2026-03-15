@@ -65,3 +65,22 @@ type TopicMemory struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
+
+// ContentRuleKind defines rule mode for deterministic filtering.
+type ContentRuleKind string
+
+const (
+	ContentRuleKindBlacklist ContentRuleKind = "blacklist"
+	ContentRuleKindWhitelist ContentRuleKind = "whitelist"
+)
+
+// ContentRule defines a simple channel-scoped or global text matching rule.
+type ContentRule struct {
+	ID        int64
+	ChannelID *int64
+	Kind      ContentRuleKind
+	Pattern   string
+	Enabled   bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}

@@ -35,12 +35,20 @@ type TopicMemoryRepository struct {
 	db *sql.DB
 }
 
+// ContentRuleRepository is a PostgreSQL implementation of domain.ContentRuleRepository.
+type ContentRuleRepository struct {
+	db *sql.DB
+}
+
 func NewChannelRepository(db *sql.DB) *ChannelRepository       { return &ChannelRepository{db: db} }
 func NewSourceRepository(db *sql.DB) *SourceRepository         { return &SourceRepository{db: db} }
 func NewSourceItemRepository(db *sql.DB) *SourceItemRepository { return &SourceItemRepository{db: db} }
 func NewDraftRepository(db *sql.DB) *DraftRepository           { return &DraftRepository{db: db} }
 func NewTopicMemoryRepository(db *sql.DB) *TopicMemoryRepository {
 	return &TopicMemoryRepository{db: db}
+}
+func NewContentRuleRepository(db *sql.DB) *ContentRuleRepository {
+	return &ContentRuleRepository{db: db}
 }
 
 func ensureDB(db *sql.DB) error {
@@ -378,8 +386,78 @@ func (r *TopicMemoryRepository) ListTopByChannel(ctx context.Context, channelID 
 	return out, nil
 }
 
+func (r *ContentRuleRepository) Create(ctx context.Context, rule domain.ContentRule) (domain.ContentRule, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.ContentRule{}, err
+	}
+	rule.Pattern = strings.TrimSpace(strings.ToLower(rule.Pattern))
+	if rule.Pattern == "" {
+		return domain.ContentRule{}, fmt.Errorf("rule pattern is empty")
+	}
+	if rule.Kind != domain.ContentRuleKindBlacklist && rule.Kind != domain.ContentRuleKindWhitelist {
+		return domain.ContentRule{}, fmt.Errorf("rule kind is invalid")
+	}
+	if !rule.Enabled {
+		rule.Enabled = true
+	}
+
+	const q = `INSERT INTO content_rules (channel_id, kind, pattern, enabled)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, channel_id, kind, pattern, enabled, created_at, updated_at`
+	row := r.db.QueryRowContext(ctx, q, rule.ChannelID, rule.Kind, rule.Pattern, rule.Enabled)
+	if err := scanContentRule(row, &rule); err != nil {
+		return domain.ContentRule{}, fmt.Errorf("create content rule: %w", err)
+	}
+	return rule, nil
+}
+
+func (r *ContentRuleRepository) ListEnabled(ctx context.Context, channelID *int64) ([]domain.ContentRule, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if channelID != nil && *channelID <= 0 {
+		return nil, fmt.Errorf("channel id must be greater than zero")
+	}
+
+	const q = `SELECT id, channel_id, kind, pattern, enabled, created_at, updated_at
+		FROM content_rules
+		WHERE enabled = TRUE AND ($1::BIGINT IS NULL OR channel_id IS NULL OR channel_id = $1)
+		ORDER BY kind ASC, pattern ASC`
+	rows, err := r.db.QueryContext(ctx, q, channelID)
+	if err != nil {
+		return nil, fmt.Errorf("list enabled content rules: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]domain.ContentRule, 0)
+	for rows.Next() {
+		var rule domain.ContentRule
+		if err := scanContentRule(rows, &rule); err != nil {
+			return nil, fmt.Errorf("scan content rule: %w", err)
+		}
+		out = append(out, rule)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate content rules: %w", err)
+	}
+	return out, nil
+}
+
 type sourceItemScanner interface {
 	Scan(dest ...any) error
+}
+
+func scanContentRule(scanner sourceItemScanner, rule *domain.ContentRule) error {
+	var channelID sql.NullInt64
+	if err := scanner.Scan(&rule.ID, &channelID, &rule.Kind, &rule.Pattern, &rule.Enabled, &rule.CreatedAt, &rule.UpdatedAt); err != nil {
+		return err
+	}
+	rule.ChannelID = nil
+	if channelID.Valid {
+		value := channelID.Int64
+		rule.ChannelID = &value
+	}
+	return nil
 }
 
 func scanSourceItem(scanner sourceItemScanner, item *domain.SourceItem) error {

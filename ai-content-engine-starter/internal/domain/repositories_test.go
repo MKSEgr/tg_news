@@ -49,12 +49,22 @@ func (stubTopicMemoryRepo) ListTopByChannel(context.Context, int64, int) ([]Topi
 	return nil, nil
 }
 
+type stubContentRuleRepo struct{}
+
+func (stubContentRuleRepo) Create(context.Context, ContentRule) (ContentRule, error) {
+	return ContentRule{}, nil
+}
+func (stubContentRuleRepo) ListEnabled(context.Context, *int64) ([]ContentRule, error) {
+	return nil, nil
+}
+
 func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ ChannelRepository = stubChannelRepo{}
 	var _ SourceRepository = stubSourceRepo{}
 	var _ SourceItemRepository = stubSourceItemRepo{}
 	var _ DraftRepository = stubDraftRepo{}
 	var _ TopicMemoryRepository = stubTopicMemoryRepo{}
+	var _ ContentRuleRepository = stubContentRuleRepo{}
 }
 
 func TestErrNotFoundIsWrappable(t *testing.T) {

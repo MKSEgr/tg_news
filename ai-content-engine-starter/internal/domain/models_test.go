@@ -23,3 +23,12 @@ func TestSourceItemAllowsNullableBody(t *testing.T) {
 		t.Fatalf("SourceItem.Body = %v, want nil", item.Body)
 	}
 }
+
+func TestContentRuleKindsAreStable(t *testing.T) {
+	if ContentRuleKindBlacklist != "blacklist" {
+		t.Fatalf("ContentRuleKindBlacklist = %q, want %q", ContentRuleKindBlacklist, "blacklist")
+	}
+	if ContentRuleKindWhitelist != "whitelist" {
+		t.Fatalf("ContentRuleKindWhitelist = %q, want %q", ContentRuleKindWhitelist, "whitelist")
+	}
+}

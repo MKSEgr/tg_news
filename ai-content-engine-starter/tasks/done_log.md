@@ -40,4 +40,5 @@
 - MVP-030 completed: added focused core-logic tests for admin handler defaults/method behavior and orchestration constructor/run validation paths.
 - MVP-031 completed: final MVP cleanup by tightening admin API method-mismatch test to assert method handling without redirect coupling.
 - V2-001 completed: added PostgreSQL-backed deterministic topic memory (schema, domain model, repository, and service with focused tests).
+- V2-002 completed: added PostgreSQL-backed blacklist/whitelist content rules (schema, domain/repository contracts, postgres repository, deterministic evaluator service, and tests).
 
