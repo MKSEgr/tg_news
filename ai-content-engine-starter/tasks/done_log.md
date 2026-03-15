@@ -31,3 +31,4 @@
 - MVP-021 completed: added trend scorer service with recency+keyword scoring and unit tests.
 - MVP-022 completed: added channel router service with keyword-based routing and fallback channel selection, with unit tests.
 - MVP-023 completed: added minimal Yandex AI client with request/response handling, validation, and unit tests.
+- MVP-024 completed: added content generator service integrating AI client to produce pending drafts with prompt building and unit tests.

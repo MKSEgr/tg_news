@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: MVP
-CURRENT_TASK: MVP-024
-CURRENT_TASK_TITLE: Implement content generator
+CURRENT_TASK: MVP-025
+CURRENT_TASK_TITLE: Implement editorial guard
 STATUS: pending
 
-LAST_COMPLETED_TASK: MVP-023
+LAST_COMPLETED_TASK: MVP-024
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: MVP-025 Implement editorial guard
+NEXT_TASK_HINT: MVP-026 Implement scheduler
 
 RULES:
 - execute only CURRENT_TASK
