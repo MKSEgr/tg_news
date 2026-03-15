@@ -36,3 +36,9 @@ type DraftRepository interface {
 	ListByStatus(ctx context.Context, status DraftStatus, limit int) ([]Draft, error)
 	UpdateStatus(ctx context.Context, id int64, status DraftStatus) error
 }
+
+// TopicMemoryRepository defines persistence operations for topic memory.
+type TopicMemoryRepository interface {
+	UpsertMention(ctx context.Context, memory TopicMemory) (TopicMemory, error)
+	ListTopByChannel(ctx context.Context, channelID int64, limit int) ([]TopicMemory, error)
+}

@@ -40,11 +40,21 @@ func (stubDraftRepo) ListByStatus(context.Context, DraftStatus, int) ([]Draft, e
 }
 func (stubDraftRepo) UpdateStatus(context.Context, int64, DraftStatus) error { return nil }
 
+type stubTopicMemoryRepo struct{}
+
+func (stubTopicMemoryRepo) UpsertMention(context.Context, TopicMemory) (TopicMemory, error) {
+	return TopicMemory{}, nil
+}
+func (stubTopicMemoryRepo) ListTopByChannel(context.Context, int64, int) ([]TopicMemory, error) {
+	return nil, nil
+}
+
 func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ ChannelRepository = stubChannelRepo{}
 	var _ SourceRepository = stubSourceRepo{}
 	var _ SourceItemRepository = stubSourceItemRepo{}
 	var _ DraftRepository = stubDraftRepo{}
+	var _ TopicMemoryRepository = stubTopicMemoryRepo{}
 }
 
 func TestErrNotFoundIsWrappable(t *testing.T) {

@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: V2
-CURRENT_TASK: V2-001
-CURRENT_TASK_TITLE: Implement topic memory
+CURRENT_TASK: V2-002
+CURRENT_TASK_TITLE: Implement blacklist/whitelist rules
 STATUS: pending
 
-LAST_COMPLETED_TASK: MVP-031
+LAST_COMPLETED_TASK: V2-001
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: V2-002 Implement blacklist/whitelist rules
+NEXT_TASK_HINT: V2-003 Implement performance feedback loop
 
 RULES:
 - execute only CURRENT_TASK

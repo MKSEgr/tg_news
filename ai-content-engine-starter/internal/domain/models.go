@@ -54,3 +54,14 @@ type Draft struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
+
+// TopicMemory stores deterministic per-channel topic frequency memory.
+type TopicMemory struct {
+	ID           int64
+	ChannelID    int64
+	Topic        string
+	MentionCount int
+	LastSeenAt   time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}

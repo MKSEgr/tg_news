@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"ai-content-engine-starter/internal/domain"
 )
@@ -29,10 +30,18 @@ type DraftRepository struct {
 	db *sql.DB
 }
 
+// TopicMemoryRepository is a PostgreSQL implementation of domain.TopicMemoryRepository.
+type TopicMemoryRepository struct {
+	db *sql.DB
+}
+
 func NewChannelRepository(db *sql.DB) *ChannelRepository       { return &ChannelRepository{db: db} }
 func NewSourceRepository(db *sql.DB) *SourceRepository         { return &SourceRepository{db: db} }
 func NewSourceItemRepository(db *sql.DB) *SourceItemRepository { return &SourceItemRepository{db: db} }
 func NewDraftRepository(db *sql.DB) *DraftRepository           { return &DraftRepository{db: db} }
+func NewTopicMemoryRepository(db *sql.DB) *TopicMemoryRepository {
+	return &TopicMemoryRepository{db: db}
+}
 
 func ensureDB(db *sql.DB) error {
 	if db == nil {
@@ -299,6 +308,74 @@ func (r *DraftRepository) UpdateStatus(ctx context.Context, id int64, status dom
 		return domain.ErrNotFound
 	}
 	return nil
+}
+
+func (r *TopicMemoryRepository) UpsertMention(ctx context.Context, memory domain.TopicMemory) (domain.TopicMemory, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.TopicMemory{}, err
+	}
+	if memory.ChannelID <= 0 {
+		return domain.TopicMemory{}, fmt.Errorf("channel id must be greater than zero")
+	}
+	memory.Topic = strings.TrimSpace(memory.Topic)
+	if memory.Topic == "" {
+		return domain.TopicMemory{}, fmt.Errorf("topic is empty")
+	}
+	if memory.MentionCount <= 0 {
+		return domain.TopicMemory{}, fmt.Errorf("mention count must be greater than zero")
+	}
+	if memory.LastSeenAt.IsZero() {
+		return domain.TopicMemory{}, fmt.Errorf("last seen at is zero")
+	}
+
+	const q = `INSERT INTO topic_memory (channel_id, topic, mention_count, last_seen_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (channel_id, topic) DO UPDATE
+		SET mention_count = topic_memory.mention_count + EXCLUDED.mention_count,
+			last_seen_at = GREATEST(topic_memory.last_seen_at, EXCLUDED.last_seen_at),
+			updated_at = NOW()
+		RETURNING id, channel_id, topic, mention_count, last_seen_at, created_at, updated_at`
+	row := r.db.QueryRowContext(ctx, q, memory.ChannelID, memory.Topic, memory.MentionCount, memory.LastSeenAt)
+	if err := row.Scan(&memory.ID, &memory.ChannelID, &memory.Topic, &memory.MentionCount, &memory.LastSeenAt, &memory.CreatedAt, &memory.UpdatedAt); err != nil {
+		return domain.TopicMemory{}, fmt.Errorf("upsert topic memory: %w", err)
+	}
+	return memory, nil
+}
+
+func (r *TopicMemoryRepository) ListTopByChannel(ctx context.Context, channelID int64, limit int) ([]domain.TopicMemory, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if channelID <= 0 {
+		return nil, fmt.Errorf("channel id must be greater than zero")
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, channel_id, topic, mention_count, last_seen_at, created_at, updated_at
+		FROM topic_memory
+		WHERE channel_id = $1
+		ORDER BY mention_count DESC, last_seen_at DESC, topic ASC
+		LIMIT $2`
+	rows, err := r.db.QueryContext(ctx, q, channelID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list topic memory by channel: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]domain.TopicMemory, 0)
+	for rows.Next() {
+		var memory domain.TopicMemory
+		if err := rows.Scan(&memory.ID, &memory.ChannelID, &memory.Topic, &memory.MentionCount, &memory.LastSeenAt, &memory.CreatedAt, &memory.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan topic memory: %w", err)
+		}
+		out = append(out, memory)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate topic memory: %w", err)
+	}
+	return out, nil
 }
 
 type sourceItemScanner interface {

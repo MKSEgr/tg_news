@@ -8,3 +8,6 @@ Naming convention:
 
 Current bootstrap migration:
 - `000001_initial_schema` creates core tables for channels, sources, source items, and drafts.
+- `000002_topic_memory` creates PostgreSQL-backed deterministic topic memory per channel.
+- `000003_topic_memory_constraints` adds basic topic memory data quality checks.
+
