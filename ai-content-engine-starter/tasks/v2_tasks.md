@@ -1,0 +1,20 @@
+# V2 Tasks
+
+- [ ] V2-001 Implement topic memory
+- [ ] V2-002 Implement blacklist/whitelist rules
+- [ ] V2-003 Implement performance feedback loop
+- [ ] V2-004 Integrate memory into scorer/router/editorial
+- [ ] V2-005 Integrate rules into pipeline
+- [ ] V2-006 Integrate feedback into scoring/generation/routing
+- [ ] V2-007 Implement A/B variants
+- [ ] V2-008 Implement variant attribution
+- [ ] V2-009 Implement auto repost
+- [ ] V2-010 Implement per-channel analytics
+- [ ] V2-011 Implement Telegram admin bot
+- [ ] V2-012 Implement basic web UI
+- [ ] V2-013 Implement image enrichment
+- [ ] V2-014 Extend publisher for image posts
+- [ ] V2-015 Implement automatic source discovery
+- [ ] V2-016 Integrate discovery with analytics/rules
+- [ ] V2-017 Final V2 architecture review
+- [ ] V2-018 Create rollout plan and feature flags validation

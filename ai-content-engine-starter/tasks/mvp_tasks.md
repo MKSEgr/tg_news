@@ -1,0 +1,33 @@
+# MVP Tasks
+
+- [ ] MVP-001 Create project skeleton
+- [ ] MVP-002 Add config loader
+- [ ] MVP-003 Add structured logger
+- [ ] MVP-004 Add graceful shutdown
+- [ ] MVP-005 Add HTTP server with /health
+- [ ] MVP-006 Add PostgreSQL bootstrap
+- [ ] MVP-007 Add Redis bootstrap
+- [ ] MVP-008 Add Docker Compose
+- [ ] MVP-009 Add initial migrations
+- [ ] MVP-010 Implement domain models
+- [ ] MVP-011 Implement repository interfaces
+- [ ] MVP-012 Implement PostgreSQL repositories
+- [ ] MVP-013 Implement source/channel seed logic
+- [ ] MVP-014 Implement collector framework
+- [ ] MVP-015 Implement RSS collector
+- [ ] MVP-016 Implement GitHub collector
+- [ ] MVP-017 Implement Reddit collector
+- [ ] MVP-018 Implement Product Hunt collector
+- [ ] MVP-019 Implement normalizer
+- [ ] MVP-020 Implement dedup
+- [ ] MVP-021 Implement trend scorer
+- [ ] MVP-022 Implement channel router
+- [ ] MVP-023 Implement Yandex AI client
+- [ ] MVP-024 Implement content generator
+- [ ] MVP-025 Implement editorial guard
+- [ ] MVP-026 Implement scheduler
+- [ ] MVP-027 Implement Telegram publisher
+- [ ] MVP-028 Implement orchestration jobs
+- [ ] MVP-029 Implement admin HTTP API
+- [ ] MVP-030 Add tests for core logic
+- [ ] MVP-031 Final MVP review and cleanup
