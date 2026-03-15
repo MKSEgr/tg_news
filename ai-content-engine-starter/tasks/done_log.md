@@ -22,3 +22,5 @@
 - MVP-012 completed: added PostgreSQL repository implementations for channels, sources, source items, and drafts.
 - MVP-013 completed: added idempotent source/channel seed service with defaults and unit tests.
 - MVP-014 completed: added collector framework orchestration with collector registry and persistence flow.
+- MVP-015 completed: implemented RSS collector with HTTP fetch, XML parsing, and source item mapping.
+- MVP-016 completed: implemented GitHub collector with API fetch, JSON parsing, and source item mapping.

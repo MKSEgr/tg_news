@@ -14,8 +14,8 @@
 - [x] MVP-012 Implement PostgreSQL repositories
 - [x] MVP-013 Implement source/channel seed logic
 - [x] MVP-014 Implement collector framework
-- [ ] MVP-015 Implement RSS collector
-- [ ] MVP-016 Implement GitHub collector
+- [x] MVP-015 Implement RSS collector
+- [x] MVP-016 Implement GitHub collector
 - [ ] MVP-017 Implement Reddit collector
 - [ ] MVP-018 Implement Product Hunt collector
 - [ ] MVP-019 Implement normalizer
