@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: MVP
-CURRENT_TASK: MVP-023
-CURRENT_TASK_TITLE: Implement Yandex AI client
+CURRENT_TASK: MVP-024
+CURRENT_TASK_TITLE: Implement content generator
 STATUS: pending
 
-LAST_COMPLETED_TASK: MVP-022
+LAST_COMPLETED_TASK: MVP-023
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: MVP-024 Implement content generator
+NEXT_TASK_HINT: MVP-025 Implement editorial guard
 
 RULES:
 - execute only CURRENT_TASK

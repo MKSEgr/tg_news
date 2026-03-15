@@ -53,3 +53,20 @@ func TestRouteValidation(t *testing.T) {
 		t.Fatalf("expected error for unroutable channels")
 	}
 }
+
+func TestRouteFallbackWithoutNewsIsDeterministic(t *testing.T) {
+	svc := New()
+
+	channels := []domain.Channel{
+		{ID: 20, Slug: "ai-tools", Name: "AI Tools"},
+		{ID: 30, Slug: "ai-workflows", Name: "AI Workflows"},
+	}
+
+	ids, err := svc.Route(domain.SourceItem{Title: "Weekly update"}, channels)
+	if err != nil {
+		t.Fatalf("Route() error = %v", err)
+	}
+	if len(ids) != 1 || ids[0] != 20 {
+		t.Fatalf("ids = %v, want [20]", ids)
+	}
+}

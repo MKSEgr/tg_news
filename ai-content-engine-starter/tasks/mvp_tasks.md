@@ -22,7 +22,7 @@
 - [x] MVP-020 Implement dedup
 - [x] MVP-021 Implement trend scorer
 - [x] MVP-022 Implement channel router
-- [ ] MVP-023 Implement Yandex AI client
+- [x] MVP-023 Implement Yandex AI client
 - [ ] MVP-024 Implement content generator
 - [ ] MVP-025 Implement editorial guard
 - [ ] MVP-026 Implement scheduler

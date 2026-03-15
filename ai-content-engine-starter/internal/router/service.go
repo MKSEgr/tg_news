@@ -33,10 +33,14 @@ func (s *Service) Route(item domain.SourceItem, channels []domain.Channel) ([]in
 	}
 
 	bySlug := make(map[string]domain.Channel, len(channels))
+	firstRoutableID := int64(0)
 	for _, channel := range channels {
 		slug := strings.TrimSpace(channel.Slug)
 		if slug == "" || channel.ID <= 0 {
 			continue
+		}
+		if firstRoutableID == 0 {
+			firstRoutableID = channel.ID
 		}
 		bySlug[slug] = channel
 	}
@@ -75,10 +79,7 @@ func (s *Service) Route(item domain.SourceItem, channels []domain.Channel) ([]in
 		if _, ok := bySlug["ai-news"]; ok {
 			push("ai-news")
 		} else {
-			for _, channel := range bySlug {
-				out = append(out, channel.ID)
-				break
-			}
+			out = append(out, firstRoutableID)
 		}
 	}
 
