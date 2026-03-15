@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: MVP
-CURRENT_TASK: MVP-012
-CURRENT_TASK_TITLE: Implement PostgreSQL repositories
+CURRENT_TASK: MVP-013
+CURRENT_TASK_TITLE: Implement source/channel seed logic
 STATUS: pending
 
-LAST_COMPLETED_TASK: MVP-011
+LAST_COMPLETED_TASK: MVP-012
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: MVP-013 Implement source/channel seed logic
+NEXT_TASK_HINT: MVP-014 Implement collector framework
 
 RULES:
 - execute only CURRENT_TASK

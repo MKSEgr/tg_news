@@ -11,7 +11,7 @@
 - [x] MVP-009 Add initial migrations
 - [x] MVP-010 Implement domain models
 - [x] MVP-011 Implement repository interfaces
-- [ ] MVP-012 Implement PostgreSQL repositories
+- [x] MVP-012 Implement PostgreSQL repositories
 - [ ] MVP-013 Implement source/channel seed logic
 - [ ] MVP-014 Implement collector framework
 - [ ] MVP-015 Implement RSS collector
