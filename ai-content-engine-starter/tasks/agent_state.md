@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: MVP
-CURRENT_TASK: MVP-017
-CURRENT_TASK_TITLE: Implement Reddit collector
+CURRENT_TASK: MVP-018
+CURRENT_TASK_TITLE: Implement Product Hunt collector
 STATUS: pending
 
-LAST_COMPLETED_TASK: MVP-016
+LAST_COMPLETED_TASK: MVP-017
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: MVP-018 Implement Product Hunt collector
+NEXT_TASK_HINT: MVP-019 Implement normalizer
 
 RULES:
 - execute only CURRENT_TASK

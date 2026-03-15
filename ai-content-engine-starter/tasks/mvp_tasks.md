@@ -16,7 +16,7 @@
 - [x] MVP-014 Implement collector framework
 - [x] MVP-015 Implement RSS collector
 - [x] MVP-016 Implement GitHub collector
-- [ ] MVP-017 Implement Reddit collector
+- [x] MVP-017 Implement Reddit collector
 - [ ] MVP-018 Implement Product Hunt collector
 - [ ] MVP-019 Implement normalizer
 - [ ] MVP-020 Implement dedup
