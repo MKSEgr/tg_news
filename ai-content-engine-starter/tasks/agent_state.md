@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: MVP
-CURRENT_TASK: MVP-010
-CURRENT_TASK_TITLE: Implement domain models
+CURRENT_TASK: MVP-011
+CURRENT_TASK_TITLE: Implement repository interfaces
 STATUS: pending
 
-LAST_COMPLETED_TASK: MVP-009
+LAST_COMPLETED_TASK: MVP-010
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: MVP-011 Implement repository interfaces
+NEXT_TASK_HINT: MVP-012 Implement PostgreSQL repositories
 
 RULES:
 - execute only CURRENT_TASK

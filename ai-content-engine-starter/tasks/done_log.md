@@ -17,3 +17,4 @@
 - MVP-007 completed: added Redis address config requirement and bootstrap validation package.
 - MVP-008 completed: added Docker Compose for app, PostgreSQL, and Redis with healthchecks.
 - MVP-009 completed: added initial PostgreSQL SQL migrations for channels, sources, source items, and drafts.
+- MVP-010 completed: added core domain models and draft status constants aligned with initial schema.
