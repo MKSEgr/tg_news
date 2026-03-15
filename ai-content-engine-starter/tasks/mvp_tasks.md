@@ -24,7 +24,7 @@
 - [x] MVP-022 Implement channel router
 - [x] MVP-023 Implement Yandex AI client
 - [x] MVP-024 Implement content generator
-- [ ] MVP-025 Implement editorial guard
+- [x] MVP-025 Implement editorial guard
 - [ ] MVP-026 Implement scheduler
 - [ ] MVP-027 Implement Telegram publisher
 - [ ] MVP-028 Implement orchestration jobs
