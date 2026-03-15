@@ -43,3 +43,5 @@
 - V2-002 completed: added PostgreSQL-backed blacklist/whitelist content rules (schema, domain/repository contracts, postgres repository, deterministic evaluator service, and tests).
 - V2-003 completed: added PostgreSQL-backed deterministic performance feedback loop (schema, domain/repository contracts, postgres repository, and feedback service with tests).
 
+
+- V2-004 completed: integrated topic memory signals into scorer, router, editorial guard, and pipeline orchestration with backward-compatible optional interfaces and focused tests.

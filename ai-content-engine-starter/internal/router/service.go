@@ -25,6 +25,11 @@ func New() *Service {
 
 // Route returns matching channel IDs for the given item and channel catalog.
 func (s *Service) Route(item domain.SourceItem, channels []domain.Channel) ([]int64, error) {
+	return s.RouteWithMemory(item, channels, nil)
+}
+
+// RouteWithMemory extends keyword routing with deterministic topic-memory matches.
+func (s *Service) RouteWithMemory(item domain.SourceItem, channels []domain.Channel, memoryByChannel map[int64][]domain.TopicMemory) ([]int64, error) {
 	if s == nil {
 		return nil, fmt.Errorf("router service is nil")
 	}
@@ -75,6 +80,23 @@ func (s *Service) Route(item domain.SourceItem, channels []domain.Channel) ([]in
 		push("ai-workflows")
 	}
 
+	for _, channel := range channels {
+		if channel.ID <= 0 {
+			continue
+		}
+		memories := memoryByChannel[channel.ID]
+		for _, memory := range memories {
+			topic := strings.ToLower(strings.TrimSpace(memory.Topic))
+			if topic == "" {
+				continue
+			}
+			if strings.Contains(text, topic) {
+				out = appendUnique(out, channel.ID)
+				break
+			}
+		}
+	}
+
 	if len(out) == 0 {
 		if _, ok := bySlug["ai-news"]; ok {
 			push("ai-news")
@@ -84,6 +106,15 @@ func (s *Service) Route(item domain.SourceItem, channels []domain.Channel) ([]in
 	}
 
 	return out, nil
+}
+
+func appendUnique(ids []int64, value int64) []int64 {
+	for _, existing := range ids {
+		if existing == value {
+			return ids
+		}
+	}
+	return append(ids, value)
 }
 
 func containsAny(text string, keywords []string) bool {

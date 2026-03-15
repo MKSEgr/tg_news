@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
+	"strings"
 
 	"ai-content-engine-starter/internal/domain"
 	"ai-content-engine-starter/internal/editorial"
@@ -31,6 +33,7 @@ type PipelineJob struct {
 	router             channelRouter
 	generator          draftGenerator
 	guard              draftGuard
+	topicMemory        topicMemoryReader
 	recentItemsLimit   int
 	existingDraftLimit int
 }
@@ -61,6 +64,22 @@ type draftGenerator interface {
 
 type draftGuard interface {
 	Check(draft domain.Draft) (editorial.Result, error)
+}
+
+type topicMemoryReader interface {
+	TopTopics(ctx context.Context, channelID int64, limit int) ([]domain.TopicMemory, error)
+}
+
+type memoryAwareScorer interface {
+	ScoreWithMemory(item domain.SourceItem, memories []domain.TopicMemory) int
+}
+
+type memoryAwareRouter interface {
+	RouteWithMemory(item domain.SourceItem, channels []domain.Channel, memoryByChannel map[int64][]domain.TopicMemory) ([]int64, error)
+}
+
+type memoryAwareGuard interface {
+	CheckWithMemory(draft domain.Draft, memories []domain.TopicMemory) (editorial.Result, error)
 }
 
 // NewCollectorJob creates a collection job.
@@ -100,6 +119,7 @@ func NewPipelineJob(
 	router channelRouter,
 	generator draftGenerator,
 	guard draftGuard,
+	topicMemory topicMemoryReader,
 ) (*PipelineJob, error) {
 	if sources == nil {
 		return nil, fmt.Errorf("source repository is nil")
@@ -143,6 +163,7 @@ func NewPipelineJob(
 		router:             router,
 		generator:          generator,
 		guard:              guard,
+		topicMemory:        topicMemory,
 		recentItemsLimit:   defaultRecentItemsLimit,
 		existingDraftLimit: defaultExistingLimit,
 	}, nil
@@ -166,8 +187,17 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 		return fmt.Errorf("list channels: %w", err)
 	}
 	channelByID := make(map[int64]domain.Channel, len(channels))
+	memoryByChannel := make(map[int64][]domain.TopicMemory, len(channels))
 	for _, channel := range channels {
 		channelByID[channel.ID] = channel
+		if j.topicMemory == nil || channel.ID <= 0 {
+			continue
+		}
+		topics, err := j.topicMemory.TopTopics(ctx, channel.ID, 10)
+		if err != nil {
+			return fmt.Errorf("top topics for channel %d: %w", channel.ID, err)
+		}
+		memoryByChannel[channel.ID] = topics
 	}
 
 	existing, err := j.existingDraftKeys(ctx)
@@ -195,11 +225,18 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				continue
 			}
 
-			if j.scorer.Score(normalized) <= 0 {
+			score := j.scorer.Score(normalized)
+			if memoryScorer, ok := j.scorer.(memoryAwareScorer); ok {
+				score = memoryScorer.ScoreWithMemory(normalized, flattenMemory(memoryByChannel))
+			}
+			if score <= 0 {
 				continue
 			}
 
 			targetIDs, err := j.router.Route(normalized, channels)
+			if memoryRouter, ok := j.router.(memoryAwareRouter); ok {
+				targetIDs, err = memoryRouter.RouteWithMemory(normalized, channels, memoryByChannel)
+			}
 			if err != nil {
 				return fmt.Errorf("route item %d: %w", item.ID, err)
 			}
@@ -219,6 +256,9 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 					return fmt.Errorf("generate draft for item %d, channel %d: %w", normalized.ID, channelID, err)
 				}
 				result, err := j.guard.Check(draft)
+				if memoryGuard, ok := j.guard.(memoryAwareGuard); ok {
+					result, err = memoryGuard.CheckWithMemory(draft, memoryByChannel[channelID])
+				}
 				if err != nil {
 					return fmt.Errorf("editorial guard for item %d, channel %d: %w", normalized.ID, channelID, err)
 				}
@@ -234,6 +274,33 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func flattenMemory(memoryByChannel map[int64][]domain.TopicMemory) []domain.TopicMemory {
+	if len(memoryByChannel) == 0 {
+		return nil
+	}
+
+	channelIDs := make([]int64, 0, len(memoryByChannel))
+	for channelID := range memoryByChannel {
+		channelIDs = append(channelIDs, channelID)
+	}
+	sort.Slice(channelIDs, func(i, j int) bool { return channelIDs[i] < channelIDs[j] })
+
+	out := make([]domain.TopicMemory, 0)
+	for _, channelID := range channelIDs {
+		topics := append([]domain.TopicMemory(nil), memoryByChannel[channelID]...)
+		sort.Slice(topics, func(i, j int) bool {
+			left := strings.TrimSpace(strings.ToLower(topics[i].Topic))
+			right := strings.TrimSpace(strings.ToLower(topics[j].Topic))
+			if left == right {
+				return topics[i].MentionCount > topics[j].MentionCount
+			}
+			return left < right
+		})
+		out = append(out, topics...)
+	}
+	return out
 }
 
 type draftKey struct {

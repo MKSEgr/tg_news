@@ -69,3 +69,19 @@ func TestScoreHandlesNilServiceOrNowFn(t *testing.T) {
 		t.Fatalf("score = %d, want in [0,100]", score)
 	}
 }
+
+func TestScoreWithMemoryAddsDeterministicBoost(t *testing.T) {
+	now := time.Date(2026, 3, 15, 12, 0, 0, 0, time.UTC)
+	svc := New(func() time.Time { return now })
+	body := "Deep dive into transformers for production"
+
+	withoutMemory := svc.Score(domain.SourceItem{Title: "Engineering notes", Body: &body})
+	withMemory := svc.ScoreWithMemory(domain.SourceItem{Title: "Engineering notes", Body: &body}, []domain.TopicMemory{
+		{Topic: "transformers", MentionCount: 5},
+		{Topic: "agents", MentionCount: 3},
+	})
+
+	if withMemory <= withoutMemory {
+		t.Fatalf("withMemory=%d, withoutMemory=%d, want boost", withMemory, withoutMemory)
+	}
+}

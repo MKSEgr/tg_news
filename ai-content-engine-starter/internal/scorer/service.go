@@ -13,6 +13,7 @@ const (
 	recencyWindowHours = 48
 	maxRecencyPoints   = 60
 	maxRelevancePoints = 40
+	maxMemoryPoints    = 20
 )
 
 // Service calculates a simple trend score for normalized source items.
@@ -30,6 +31,11 @@ func New(nowFn func() time.Time) *Service {
 
 // Score returns an integer trend score in range [0..100].
 func (s *Service) Score(item domain.SourceItem) int {
+	return s.ScoreWithMemory(item, nil)
+}
+
+// ScoreWithMemory applies deterministic score plus small explainable topic-memory boost.
+func (s *Service) ScoreWithMemory(item domain.SourceItem, memories []domain.TopicMemory) int {
 	if s == nil {
 		return 0
 	}
@@ -40,8 +46,9 @@ func (s *Service) Score(item domain.SourceItem) int {
 	now := s.nowFn().UTC()
 	recency := scoreRecency(item.PublishedAt, now)
 	relevance := scoreRelevance(item.Title, item.Body)
+	memory := scoreMemoryRelevance(item.Title, item.Body, memories)
 
-	total := recency + relevance
+	total := recency + relevance + memory
 	if total < 0 {
 		return 0
 	}
@@ -86,6 +93,34 @@ func scoreRelevance(title string, body *string) int {
 	}
 	if points > maxRelevancePoints {
 		return maxRelevancePoints
+	}
+	return points
+}
+
+func scoreMemoryRelevance(title string, body *string, memories []domain.TopicMemory) int {
+	if len(memories) == 0 {
+		return 0
+	}
+	text := strings.ToLower(strings.TrimSpace(title))
+	if body != nil {
+		text += " " + strings.ToLower(strings.TrimSpace(*body))
+	}
+	if text == "" {
+		return 0
+	}
+
+	points := 0
+	for _, memory := range memories {
+		topic := strings.ToLower(strings.TrimSpace(memory.Topic))
+		if topic == "" {
+			continue
+		}
+		if strings.Contains(text, topic) {
+			points += 4
+		}
+		if points >= maxMemoryPoints {
+			return maxMemoryPoints
+		}
 	}
 	return points
 }

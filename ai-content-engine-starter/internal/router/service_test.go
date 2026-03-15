@@ -70,3 +70,23 @@ func TestRouteFallbackWithoutNewsIsDeterministic(t *testing.T) {
 		t.Fatalf("ids = %v, want [20]", ids)
 	}
 }
+
+func TestRouteWithMemoryAddsChannelMatch(t *testing.T) {
+	svc := New()
+	channels := []domain.Channel{
+		{ID: 1, Slug: "ai-news", Name: "AI News"},
+		{ID: 2, Slug: "ai-tools", Name: "AI Tools"},
+	}
+
+	ids, err := svc.RouteWithMemory(
+		domain.SourceItem{Title: "Case study on ai inference optimization"},
+		channels,
+		map[int64][]domain.TopicMemory{2: {{Topic: "inference", MentionCount: 8}}},
+	)
+	if err != nil {
+		t.Fatalf("RouteWithMemory() error = %v", err)
+	}
+	if len(ids) != 1 || ids[0] != 2 {
+		t.Fatalf("ids = %v, want [2]", ids)
+	}
+}

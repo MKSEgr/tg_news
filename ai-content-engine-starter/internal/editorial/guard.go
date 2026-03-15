@@ -35,6 +35,11 @@ func NewGuard() *Guard {
 
 // Check validates a draft and returns acceptance result.
 func (g *Guard) Check(draft domain.Draft) (Result, error) {
+	return g.CheckWithMemory(draft, nil)
+}
+
+// CheckWithMemory validates draft with base checks plus deterministic topic-memory repetition guard.
+func (g *Guard) CheckWithMemory(draft domain.Draft, memories []domain.TopicMemory) (Result, error) {
 	if g == nil {
 		return Result{}, fmt.Errorf("editorial guard is nil")
 	}
@@ -73,5 +78,28 @@ func (g *Guard) Check(draft domain.Draft) (Result, error) {
 		}
 	}
 
+	if hasOverusedTopic(lowerBody, memories) {
+		reasons = append(reasons, "contains overused topic")
+	}
+
 	return Result{Accepted: len(reasons) == 0, Reasons: reasons}, nil
+}
+
+func hasOverusedTopic(text string, memories []domain.TopicMemory) bool {
+	if text == "" {
+		return false
+	}
+	for _, memory := range memories {
+		if memory.MentionCount < 10 {
+			continue
+		}
+		topic := strings.ToLower(strings.TrimSpace(memory.Topic))
+		if len([]rune(topic)) < 3 {
+			continue
+		}
+		if strings.Contains(text, topic) {
+			return true
+		}
+	}
+	return false
 }

@@ -86,3 +86,20 @@ func TestCheckRejectsNilGuard(t *testing.T) {
 		t.Fatalf("expected error for nil guard")
 	}
 }
+
+func TestCheckWithMemoryRejectsOverusedTopic(t *testing.T) {
+	guard := NewGuard()
+	result, err := guard.CheckWithMemory(domain.Draft{
+		SourceItemID: 1,
+		ChannelID:    2,
+		Title:        "AI weekly update",
+		Body:         "This week: llm updates and benchmarks.",
+		Status:       domain.DraftStatusPending,
+	}, []domain.TopicMemory{{Topic: "llm", MentionCount: 12}})
+	if err != nil {
+		t.Fatalf("CheckWithMemory() error = %v", err)
+	}
+	if result.Accepted {
+		t.Fatalf("expected rejected due to overused topic")
+	}
+}
