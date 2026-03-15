@@ -26,7 +26,7 @@
 - [x] MVP-024 Implement content generator
 - [x] MVP-025 Implement editorial guard
 - [x] MVP-026 Implement scheduler
-- [ ] MVP-027 Implement Telegram publisher
+- [x] MVP-027 Implement Telegram publisher
 - [ ] MVP-028 Implement orchestration jobs
 - [ ] MVP-029 Implement admin HTTP API
 - [ ] MVP-030 Add tests for core logic

@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: MVP
-CURRENT_TASK: MVP-027
-CURRENT_TASK_TITLE: Implement Telegram publisher
+CURRENT_TASK: MVP-028
+CURRENT_TASK_TITLE: Implement orchestration jobs
 STATUS: pending
 
-LAST_COMPLETED_TASK: MVP-026
+LAST_COMPLETED_TASK: MVP-027
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: MVP-028 Implement orchestration jobs
+NEXT_TASK_HINT: MVP-029 Implement admin HTTP API
 
 RULES:
 - execute only CURRENT_TASK
