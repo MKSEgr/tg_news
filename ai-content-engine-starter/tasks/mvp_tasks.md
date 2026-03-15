@@ -1,12 +1,12 @@
 # MVP Tasks
 
-- [ ] MVP-001 Create project skeleton
-- [ ] MVP-002 Add config loader
-- [ ] MVP-003 Add structured logger
-- [ ] MVP-004 Add graceful shutdown
-- [ ] MVP-005 Add HTTP server with /health
-- [ ] MVP-006 Add PostgreSQL bootstrap
-- [ ] MVP-007 Add Redis bootstrap
+- [x] MVP-001 Create project skeleton
+- [x] MVP-002 Add config loader
+- [x] MVP-003 Add structured logger
+- [x] MVP-004 Add graceful shutdown
+- [x] MVP-005 Add HTTP server with /health
+- [x] MVP-006 Add PostgreSQL bootstrap
+- [x] MVP-007 Add Redis bootstrap
 - [ ] MVP-008 Add Docker Compose
 - [ ] MVP-009 Add initial migrations
 - [ ] MVP-010 Implement domain models
