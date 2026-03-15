@@ -28,6 +28,6 @@
 - [x] MVP-026 Implement scheduler
 - [x] MVP-027 Implement Telegram publisher
 - [x] MVP-028 Implement orchestration jobs
-- [ ] MVP-029 Implement admin HTTP API
+- [x] MVP-029 Implement admin HTTP API
 - [ ] MVP-030 Add tests for core logic
 - [ ] MVP-031 Final MVP review and cleanup
