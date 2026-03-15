@@ -26,3 +26,4 @@
 - MVP-016 completed: implemented GitHub collector with API fetch, JSON parsing, and source item mapping.
 - MVP-017 completed: implemented Reddit collector with listing fetch, JSON parsing, and source item mapping.
 - MVP-018 completed: implemented Product Hunt collector with endpoint validation, optional endpoint-driven auth headers/token, JSON parsing, and source item mapping.
+- MVP-019 completed: added normalizer service for canonical URL and text normalization with validation and unit tests.

@@ -18,7 +18,7 @@
 - [x] MVP-016 Implement GitHub collector
 - [x] MVP-017 Implement Reddit collector
 - [x] MVP-018 Implement Product Hunt collector
-- [ ] MVP-019 Implement normalizer
+- [x] MVP-019 Implement normalizer
 - [ ] MVP-020 Implement dedup
 - [ ] MVP-021 Implement trend scorer
 - [ ] MVP-022 Implement channel router
