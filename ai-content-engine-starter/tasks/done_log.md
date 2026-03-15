@@ -20,3 +20,4 @@
 - MVP-010 completed: added core domain models and draft status constants aligned with initial schema.
 - MVP-011 completed: added domain repository interfaces for channels, sources, source items, and drafts.
 - MVP-012 completed: added PostgreSQL repository implementations for channels, sources, source items, and drafts.
+- MVP-013 completed: added idempotent source/channel seed service with defaults and unit tests.

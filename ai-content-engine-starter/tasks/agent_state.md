@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: MVP
-CURRENT_TASK: MVP-013
-CURRENT_TASK_TITLE: Implement source/channel seed logic
+CURRENT_TASK: MVP-014
+CURRENT_TASK_TITLE: Implement collector framework
 STATUS: pending
 
-LAST_COMPLETED_TASK: MVP-012
+LAST_COMPLETED_TASK: MVP-013
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: MVP-014 Implement collector framework
+NEXT_TASK_HINT: MVP-015 Implement RSS collector
 
 RULES:
 - execute only CURRENT_TASK
