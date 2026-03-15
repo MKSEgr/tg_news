@@ -1,6 +1,6 @@
 # V2 Tasks
 
-- [ ] V2-001 Implement topic memory
+- [x] V2-001 Implement topic memory
 - [ ] V2-002 Implement blacklist/whitelist rules
 - [ ] V2-003 Implement performance feedback loop
 - [ ] V2-004 Integrate memory into scorer/router/editorial
