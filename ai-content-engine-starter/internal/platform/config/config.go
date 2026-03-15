@@ -17,6 +17,7 @@ type Config struct {
 	AppEnv      string
 	HTTPPort    int
 	PostgresDSN string
+	RedisAddr   string
 }
 
 // Load reads configuration from environment variables and applies defaults.
@@ -25,6 +26,7 @@ func Load() (Config, error) {
 		AppEnv:      getEnvOrDefault("APP_ENV", defaultAppEnv),
 		HTTPPort:    defaultHTTPPort,
 		PostgresDSN: strings.TrimSpace(os.Getenv("POSTGRES_DSN")),
+		RedisAddr:   strings.TrimSpace(os.Getenv("REDIS_ADDR")),
 	}
 
 	if rawPort := os.Getenv("HTTP_PORT"); rawPort != "" {
@@ -40,6 +42,9 @@ func Load() (Config, error) {
 
 	if cfg.PostgresDSN == "" {
 		return Config{}, fmt.Errorf("POSTGRES_DSN is required")
+	}
+	if cfg.RedisAddr == "" {
+		return Config{}, fmt.Errorf("REDIS_ADDR is required")
 	}
 
 	return cfg, nil

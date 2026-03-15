@@ -14,6 +14,7 @@ import (
 	"ai-content-engine-starter/internal/platform/config"
 	"ai-content-engine-starter/internal/platform/logger"
 	"ai-content-engine-starter/internal/platform/postgres"
+	"ai-content-engine-starter/internal/platform/redis"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -32,6 +33,9 @@ func New() (*App, error) {
 	}
 	if err := postgres.ValidateDSN(cfg.PostgresDSN); err != nil {
 		return nil, fmt.Errorf("validate postgres dsn: %w", err)
+	}
+	if err := redis.ValidateAddr(cfg.RedisAddr); err != nil {
+		return nil, fmt.Errorf("validate redis addr: %w", err)
 	}
 
 	return &App{

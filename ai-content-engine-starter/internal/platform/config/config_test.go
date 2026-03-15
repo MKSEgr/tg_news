@@ -6,6 +6,7 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("APP_ENV", "")
 	t.Setenv("HTTP_PORT", "")
 	t.Setenv("POSTGRES_DSN", "postgres://localhost:5432/app")
+	t.Setenv("REDIS_ADDR", "localhost:6379")
 
 	cfg, err := Load()
 	if err != nil {
@@ -24,6 +25,7 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("HTTP_PORT", "9090")
 	t.Setenv("POSTGRES_DSN", "postgres://localhost:5432/app")
+	t.Setenv("REDIS_ADDR", "localhost:6379")
 
 	cfg, err := Load()
 	if err != nil {
@@ -39,11 +41,15 @@ func TestLoadFromEnv(t *testing.T) {
 	if cfg.PostgresDSN != "postgres://localhost:5432/app" {
 		t.Fatalf("PostgresDSN = %q, want %q", cfg.PostgresDSN, "postgres://localhost:5432/app")
 	}
+	if cfg.RedisAddr != "localhost:6379" {
+		t.Fatalf("RedisAddr = %q, want %q", cfg.RedisAddr, "localhost:6379")
+	}
 }
 
 func TestLoadInvalidPort(t *testing.T) {
 	t.Setenv("HTTP_PORT", "not-a-number")
 	t.Setenv("POSTGRES_DSN", "postgres://localhost:5432/app")
+	t.Setenv("REDIS_ADDR", "localhost:6379")
 
 	_, err := Load()
 	if err == nil {
@@ -54,6 +60,7 @@ func TestLoadInvalidPort(t *testing.T) {
 func TestLoadOutOfRangePort(t *testing.T) {
 	t.Setenv("HTTP_PORT", "70000")
 	t.Setenv("POSTGRES_DSN", "postgres://localhost:5432/app")
+	t.Setenv("REDIS_ADDR", "localhost:6379")
 
 	_, err := Load()
 	if err == nil {
@@ -76,5 +83,25 @@ func TestLoadWhitespacePostgresDSN(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatalf("Load() expected error when POSTGRES_DSN is whitespace")
+	}
+}
+
+func TestLoadMissingRedisAddr(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "postgres://localhost:5432/app")
+	t.Setenv("REDIS_ADDR", "")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("Load() expected error when REDIS_ADDR is empty")
+	}
+}
+
+func TestLoadWhitespaceRedisAddr(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "postgres://localhost:5432/app")
+	t.Setenv("REDIS_ADDR", "   ")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("Load() expected error when REDIS_ADDR is whitespace")
 	}
 }
