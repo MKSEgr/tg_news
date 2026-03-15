@@ -7,3 +7,43 @@
   - tasks/
   - prompts/
   - agents/
+
+- MVP-001 completed: created initial Go project skeleton (go.mod, cmd/app entrypoint, internal app package).
+- MVP-002 completed: added environment-based config loader with defaults and validation for HTTP port.
+- MVP-003 completed: added structured JSON logger with environment-based log level and app startup log.
+- MVP-004 completed: added graceful shutdown handling for SIGINT/SIGTERM in app lifecycle.
+- MVP-005 completed: added HTTP server startup/shutdown flow and /health endpoint returning status ok.
+- MVP-006 completed: added PostgreSQL DSN config requirement and bootstrap validation package.
+- MVP-007 completed: added Redis address config requirement and bootstrap validation package.
+- MVP-008 completed: added Docker Compose for app, PostgreSQL, and Redis with healthchecks.
+- MVP-009 completed: added initial PostgreSQL SQL migrations for channels, sources, source items, and drafts.
+- MVP-010 completed: added core domain models and draft status constants aligned with initial schema.
+- MVP-011 completed: added domain repository interfaces for channels, sources, source items, and drafts.
+- MVP-012 completed: added PostgreSQL repository implementations for channels, sources, source items, and drafts.
+- MVP-013 completed: added idempotent source/channel seed service with defaults and unit tests.
+- MVP-014 completed: added collector framework orchestration with collector registry and persistence flow.
+- MVP-015 completed: implemented RSS collector with HTTP fetch, XML parsing, and source item mapping.
+- MVP-016 completed: implemented GitHub collector with API fetch, JSON parsing, and source item mapping.
+- MVP-017 completed: implemented Reddit collector with listing fetch, JSON parsing, and source item mapping.
+- MVP-018 completed: implemented Product Hunt collector with endpoint validation, optional endpoint-driven auth headers/token, JSON parsing, and source item mapping.
+- MVP-019 completed: added normalizer service for canonical URL and text normalization with validation and unit tests.
+- MVP-020 completed: added dedup service with recent-item checks (external_id/url/title), validation, and unit tests.
+- MVP-021 completed: added trend scorer service with recency+keyword scoring and unit tests.
+- MVP-022 completed: added channel router service with keyword-based routing and fallback channel selection, with unit tests.
+- MVP-023 completed: added minimal Yandex AI client with request/response handling, validation, and unit tests.
+- MVP-024 completed: added content generator service integrating AI client to produce pending drafts with prompt building and unit tests.
+- MVP-025 completed: added editorial guard service with draft validation rules and focused unit tests.
+- MVP-026 completed: added minimal scheduler with periodic job execution, cancellation handling, and unit tests.
+- MVP-027 completed: added Telegram publisher client with sendMessage integration, validation, and unit tests.
+- MVP-028 completed: added orchestration jobs for collection and draft pipeline (normalize, dedup, score, route, generate, editorial check, store), with focused unit tests.
+- MVP-029 completed: added admin HTTP API handlers for listing drafts and approve/reject moderation actions, with focused handler tests.
+- MVP-030 completed: added focused core-logic tests for admin handler defaults/method behavior and orchestration constructor/run validation paths.
+- MVP-031 completed: final MVP cleanup by tightening admin API method-mismatch test to assert method handling without redirect coupling.
+- V2-001 completed: added PostgreSQL-backed deterministic topic memory (schema, domain model, repository, and service with focused tests).
+- V2-002 completed: added PostgreSQL-backed blacklist/whitelist content rules (schema, domain/repository contracts, postgres repository, deterministic evaluator service, and tests).
+- V2-003 completed: added PostgreSQL-backed deterministic performance feedback loop (schema, domain/repository contracts, postgres repository, and feedback service with tests).
+
+
+- V2-004 completed: integrated topic memory signals into scorer, router, editorial guard, and pipeline orchestration with backward-compatible optional interfaces and focused tests.
+- V2-005 completed: integrated content-rules evaluation into pipeline routing flow with optional dependency, channel-level block handling, and focused orchestration tests.
+- V2-006 completed: integrated performance feedback into pipeline scoring/routing/generation through optional feedback-aware interfaces and channel feedback averages with focused tests.
