@@ -1,7 +1,11 @@
 package app
 
 import (
+	"context"
 	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"ai-content-engine-starter/internal/platform/config"
 	"ai-content-engine-starter/internal/platform/logger"
@@ -28,6 +32,12 @@ func New() (*App, error) {
 
 // Run starts the application lifecycle.
 func (a *App) Run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	a.logger.Info("application started", "app_env", a.cfg.AppEnv, "http_port", a.cfg.HTTPPort)
+	<-ctx.Done()
+	a.logger.Info("shutdown signal received", "reason", ctx.Err())
+
 	return nil
 }
