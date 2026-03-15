@@ -48,3 +48,9 @@ type ContentRuleRepository interface {
 	Create(ctx context.Context, rule ContentRule) (ContentRule, error)
 	ListEnabled(ctx context.Context, channelID *int64) ([]ContentRule, error)
 }
+
+// PerformanceFeedbackRepository defines persistence operations for feedback loop data.
+type PerformanceFeedbackRepository interface {
+	Upsert(ctx context.Context, feedback PerformanceFeedback) (PerformanceFeedback, error)
+	GetByDraftID(ctx context.Context, draftID int64) (PerformanceFeedback, error)
+}

@@ -84,3 +84,17 @@ type ContentRule struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+// PerformanceFeedback stores explainable engagement metrics for a published draft.
+type PerformanceFeedback struct {
+	ID             int64
+	DraftID        int64
+	ChannelID      int64
+	ViewsCount     int64
+	ClicksCount    int64
+	ReactionsCount int64
+	SharesCount    int64
+	Score          float64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}

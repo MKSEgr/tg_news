@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: V2
-CURRENT_TASK: V2-003
-CURRENT_TASK_TITLE: Implement performance feedback loop
+CURRENT_TASK: V2-004
+CURRENT_TASK_TITLE: Integrate memory into scorer/router/editorial
 STATUS: pending
 
-LAST_COMPLETED_TASK: V2-002
+LAST_COMPLETED_TASK: V2-003
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: V2-004 Integrate memory into scorer/router/editorial
+NEXT_TASK_HINT: V2-005 Integrate rules into pipeline
 
 RULES:
 - execute only CURRENT_TASK

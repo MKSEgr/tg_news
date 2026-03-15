@@ -58,6 +58,15 @@ func (stubContentRuleRepo) ListEnabled(context.Context, *int64) ([]ContentRule, 
 	return nil, nil
 }
 
+type stubPerformanceFeedbackRepo struct{}
+
+func (stubPerformanceFeedbackRepo) Upsert(context.Context, PerformanceFeedback) (PerformanceFeedback, error) {
+	return PerformanceFeedback{}, nil
+}
+func (stubPerformanceFeedbackRepo) GetByDraftID(context.Context, int64) (PerformanceFeedback, error) {
+	return PerformanceFeedback{}, nil
+}
+
 func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ ChannelRepository = stubChannelRepo{}
 	var _ SourceRepository = stubSourceRepo{}
@@ -65,6 +74,7 @@ func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ DraftRepository = stubDraftRepo{}
 	var _ TopicMemoryRepository = stubTopicMemoryRepo{}
 	var _ ContentRuleRepository = stubContentRuleRepo{}
+	var _ PerformanceFeedbackRepository = stubPerformanceFeedbackRepo{}
 }
 
 func TestErrNotFoundIsWrappable(t *testing.T) {

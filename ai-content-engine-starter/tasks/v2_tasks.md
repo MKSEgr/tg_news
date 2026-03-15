@@ -2,7 +2,7 @@
 
 - [x] V2-001 Implement topic memory
 - [x] V2-002 Implement blacklist/whitelist rules
-- [ ] V2-003 Implement performance feedback loop
+- [x] V2-003 Implement performance feedback loop
 - [ ] V2-004 Integrate memory into scorer/router/editorial
 - [ ] V2-005 Integrate rules into pipeline
 - [ ] V2-006 Integrate feedback into scoring/generation/routing

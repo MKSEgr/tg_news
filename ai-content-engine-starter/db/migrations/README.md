@@ -12,4 +12,5 @@ Current bootstrap migration:
 - `000003_topic_memory_constraints` adds basic topic memory data quality checks.
 - `000004_content_rules` creates PostgreSQL-backed blacklist/whitelist rules.
 - `000005_content_rules_global_uniqueness` enforces uniqueness for global (channel_id NULL) rules.
+- `000006_performance_feedback` creates PostgreSQL-backed deterministic performance feedback storage.
 

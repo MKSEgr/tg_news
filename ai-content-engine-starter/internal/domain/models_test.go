@@ -32,3 +32,10 @@ func TestContentRuleKindsAreStable(t *testing.T) {
 		t.Fatalf("ContentRuleKindWhitelist = %q, want %q", ContentRuleKindWhitelist, "whitelist")
 	}
 }
+
+func TestPerformanceFeedbackDefaults(t *testing.T) {
+	feedback := PerformanceFeedback{}
+	if feedback.Score != 0 {
+		t.Fatalf("PerformanceFeedback.Score = %f, want 0", feedback.Score)
+	}
+}

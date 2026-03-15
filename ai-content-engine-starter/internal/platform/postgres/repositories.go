@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"ai-content-engine-starter/internal/domain"
@@ -40,6 +41,11 @@ type ContentRuleRepository struct {
 	db *sql.DB
 }
 
+// PerformanceFeedbackRepository is a PostgreSQL implementation of domain.PerformanceFeedbackRepository.
+type PerformanceFeedbackRepository struct {
+	db *sql.DB
+}
+
 func NewChannelRepository(db *sql.DB) *ChannelRepository       { return &ChannelRepository{db: db} }
 func NewSourceRepository(db *sql.DB) *SourceRepository         { return &SourceRepository{db: db} }
 func NewSourceItemRepository(db *sql.DB) *SourceItemRepository { return &SourceItemRepository{db: db} }
@@ -49,6 +55,9 @@ func NewTopicMemoryRepository(db *sql.DB) *TopicMemoryRepository {
 }
 func NewContentRuleRepository(db *sql.DB) *ContentRuleRepository {
 	return &ContentRuleRepository{db: db}
+}
+func NewPerformanceFeedbackRepository(db *sql.DB) *PerformanceFeedbackRepository {
+	return &PerformanceFeedbackRepository{db: db}
 }
 
 func ensureDB(db *sql.DB) error {
@@ -441,6 +450,64 @@ func (r *ContentRuleRepository) ListEnabled(ctx context.Context, channelID *int6
 		return nil, fmt.Errorf("iterate content rules: %w", err)
 	}
 	return out, nil
+}
+
+func (r *PerformanceFeedbackRepository) Upsert(ctx context.Context, feedback domain.PerformanceFeedback) (domain.PerformanceFeedback, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.PerformanceFeedback{}, err
+	}
+	if feedback.DraftID <= 0 {
+		return domain.PerformanceFeedback{}, fmt.Errorf("draft id must be greater than zero")
+	}
+	if feedback.ChannelID <= 0 {
+		return domain.PerformanceFeedback{}, fmt.Errorf("channel id must be greater than zero")
+	}
+	if feedback.ViewsCount < 0 || feedback.ClicksCount < 0 || feedback.ReactionsCount < 0 || feedback.SharesCount < 0 {
+		return domain.PerformanceFeedback{}, fmt.Errorf("feedback metrics must be non-negative")
+	}
+	if feedback.ViewsCount == 0 && (feedback.ClicksCount > 0 || feedback.ReactionsCount > 0 || feedback.SharesCount > 0) {
+		return domain.PerformanceFeedback{}, fmt.Errorf("views count must be positive when engagement metrics are present")
+	}
+	if feedback.Score < 0 || math.IsNaN(feedback.Score) || math.IsInf(feedback.Score, 0) {
+		return domain.PerformanceFeedback{}, fmt.Errorf("feedback score is invalid")
+	}
+
+	const q = `INSERT INTO performance_feedback (draft_id, channel_id, views_count, clicks_count, reactions_count, shares_count, score)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (draft_id) DO UPDATE
+		SET views_count = EXCLUDED.views_count,
+			clicks_count = EXCLUDED.clicks_count,
+			reactions_count = EXCLUDED.reactions_count,
+			shares_count = EXCLUDED.shares_count,
+			score = EXCLUDED.score,
+			updated_at = NOW()
+		RETURNING id, draft_id, channel_id, views_count, clicks_count, reactions_count, shares_count, score, created_at, updated_at`
+	row := r.db.QueryRowContext(ctx, q, feedback.DraftID, feedback.ChannelID, feedback.ViewsCount, feedback.ClicksCount, feedback.ReactionsCount, feedback.SharesCount, feedback.Score)
+	if err := row.Scan(&feedback.ID, &feedback.DraftID, &feedback.ChannelID, &feedback.ViewsCount, &feedback.ClicksCount, &feedback.ReactionsCount, &feedback.SharesCount, &feedback.Score, &feedback.CreatedAt, &feedback.UpdatedAt); err != nil {
+		return domain.PerformanceFeedback{}, fmt.Errorf("upsert performance feedback: %w", err)
+	}
+	return feedback, nil
+}
+
+func (r *PerformanceFeedbackRepository) GetByDraftID(ctx context.Context, draftID int64) (domain.PerformanceFeedback, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.PerformanceFeedback{}, err
+	}
+	if draftID <= 0 {
+		return domain.PerformanceFeedback{}, fmt.Errorf("draft id must be greater than zero")
+	}
+
+	const q = `SELECT id, draft_id, channel_id, views_count, clicks_count, reactions_count, shares_count, score, created_at, updated_at
+		FROM performance_feedback WHERE draft_id = $1`
+	var feedback domain.PerformanceFeedback
+	row := r.db.QueryRowContext(ctx, q, draftID)
+	if err := row.Scan(&feedback.ID, &feedback.DraftID, &feedback.ChannelID, &feedback.ViewsCount, &feedback.ClicksCount, &feedback.ReactionsCount, &feedback.SharesCount, &feedback.Score, &feedback.CreatedAt, &feedback.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.PerformanceFeedback{}, domain.ErrNotFound
+		}
+		return domain.PerformanceFeedback{}, fmt.Errorf("get performance feedback by draft id: %w", err)
+	}
+	return feedback, nil
 }
 
 type sourceItemScanner interface {
