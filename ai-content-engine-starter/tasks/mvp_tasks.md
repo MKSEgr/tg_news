@@ -17,7 +17,7 @@
 - [x] MVP-015 Implement RSS collector
 - [x] MVP-016 Implement GitHub collector
 - [x] MVP-017 Implement Reddit collector
-- [ ] MVP-018 Implement Product Hunt collector
+- [x] MVP-018 Implement Product Hunt collector
 - [ ] MVP-019 Implement normalizer
 - [ ] MVP-020 Implement dedup
 - [ ] MVP-021 Implement trend scorer
