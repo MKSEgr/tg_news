@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS ux_content_rules_global_kind_pattern;
