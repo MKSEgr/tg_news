@@ -35,3 +35,5 @@
 - MVP-025 completed: added editorial guard service with draft validation rules and focused unit tests.
 - MVP-026 completed: added minimal scheduler with periodic job execution, cancellation handling, and unit tests.
 - MVP-027 completed: added Telegram publisher client with sendMessage integration, validation, and unit tests.
+- MVP-028 completed: added orchestration jobs for collection and draft pipeline (normalize, dedup, score, route, generate, editorial check, store), with focused unit tests.
+

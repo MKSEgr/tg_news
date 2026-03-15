@@ -55,6 +55,9 @@ func (s *Service) IsDuplicate(ctx context.Context, item domain.SourceItem) (bool
 	}
 
 	for _, existing := range recent {
+		if item.ID > 0 && existing.ID == item.ID {
+			continue
+		}
 		if externalID != "" && strings.TrimSpace(existing.ExternalID) == externalID {
 			return true, nil
 		}

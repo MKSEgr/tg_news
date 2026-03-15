@@ -134,3 +134,19 @@ func TestIsDuplicateRejectsNilServiceOrRepo(t *testing.T) {
 		t.Fatalf("expected error for nil repository")
 	}
 }
+
+func TestIsDuplicateIgnoresSameItemID(t *testing.T) {
+	repo := &sourceItemRepoStub{items: []domain.SourceItem{{ID: 10, SourceID: 1, ExternalID: "ext-1"}}}
+	svc, err := New(repo, 10)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	dup, err := svc.IsDuplicate(context.Background(), domain.SourceItem{ID: 10, SourceID: 1, ExternalID: "ext-1"})
+	if err != nil {
+		t.Fatalf("IsDuplicate() error = %v", err)
+	}
+	if dup {
+		t.Fatalf("expected non-duplicate when matching item has the same ID")
+	}
+}
