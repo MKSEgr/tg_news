@@ -19,7 +19,7 @@
 - [x] MVP-017 Implement Reddit collector
 - [x] MVP-018 Implement Product Hunt collector
 - [x] MVP-019 Implement normalizer
-- [ ] MVP-020 Implement dedup
+- [x] MVP-020 Implement dedup
 - [ ] MVP-021 Implement trend scorer
 - [ ] MVP-022 Implement channel router
 - [ ] MVP-023 Implement Yandex AI client
