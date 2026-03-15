@@ -199,3 +199,63 @@ func TestListDraftsRepoError(t *testing.T) {
 		t.Fatalf("unexpected body: %s", rr.Body.String())
 	}
 }
+
+func TestListDraftsDefaultStatusAndLimit(t *testing.T) {
+	repo := &draftRepoStub{listResult: []domain.Draft{}}
+	h, _ := NewHandler(repo)
+	mux := http.NewServeMux()
+	_ = h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/drafts", nil)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	if repo.lastListStatus != domain.DraftStatusPending {
+		t.Fatalf("status = %s, want pending", repo.lastListStatus)
+	}
+	if repo.lastListLimit != defaultListLimit {
+		t.Fatalf("limit = %d, want %d", repo.lastListLimit, defaultListLimit)
+	}
+}
+
+func TestListDraftsLimitClamp(t *testing.T) {
+	repo := &draftRepoStub{listResult: []domain.Draft{}}
+	h, _ := NewHandler(repo)
+	mux := http.NewServeMux()
+	_ = h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/drafts?limit=999", nil)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	if repo.lastListLimit != maxListLimit {
+		t.Fatalf("limit = %d, want %d", repo.lastListLimit, maxListLimit)
+	}
+}
+
+func TestAdminRoutesMethodMismatch(t *testing.T) {
+	repo := &draftRepoStub{}
+	h, _ := NewHandler(repo)
+	mux := http.NewServeMux()
+	_ = h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/drafts", nil)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405", rr.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/admin/drafts/5/approve", nil)
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405", rr.Code)
+	}
+}

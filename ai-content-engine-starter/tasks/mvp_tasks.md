@@ -29,5 +29,5 @@
 - [x] MVP-027 Implement Telegram publisher
 - [x] MVP-028 Implement orchestration jobs
 - [x] MVP-029 Implement admin HTTP API
-- [ ] MVP-030 Add tests for core logic
-- [ ] MVP-031 Final MVP review and cleanup
+- [x] MVP-030 Add tests for core logic
+- [x] MVP-031 Final MVP review and cleanup

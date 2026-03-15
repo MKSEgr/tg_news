@@ -37,4 +37,6 @@
 - MVP-027 completed: added Telegram publisher client with sendMessage integration, validation, and unit tests.
 - MVP-028 completed: added orchestration jobs for collection and draft pipeline (normalize, dedup, score, route, generate, editorial check, store), with focused unit tests.
 - MVP-029 completed: added admin HTTP API handlers for listing drafts and approve/reject moderation actions, with focused handler tests.
+- MVP-030 completed: added focused core-logic tests for admin handler defaults/method behavior and orchestration constructor/run validation paths.
+- MVP-031 completed: final MVP cleanup by tightening admin API method-mismatch test to assert method handling without redirect coupling.
 

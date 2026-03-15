@@ -3,6 +3,7 @@ package orchestration
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"ai-content-engine-starter/internal/domain"
 	"ai-content-engine-starter/internal/editorial"
@@ -10,7 +11,7 @@ import (
 
 const (
 	defaultRecentItemsLimit = 50
-	defaultExistingLimit    = 500
+	defaultExistingLimit    = math.MaxInt32
 )
 
 // CollectorJob runs content collection.

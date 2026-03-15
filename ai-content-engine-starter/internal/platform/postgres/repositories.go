@@ -158,7 +158,15 @@ func (r *SourceItemRepository) Create(ctx context.Context, item domain.SourceIte
 		return domain.SourceItem{}, err
 	}
 
-	const q = `INSERT INTO source_items (source_id, external_id, url, title, body, published_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, source_id, external_id, url, title, body, published_at, collected_at, created_at`
+	const q = `INSERT INTO source_items (source_id, external_id, url, title, body, published_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (source_id, external_id) DO UPDATE
+		SET url = EXCLUDED.url,
+			title = EXCLUDED.title,
+			body = EXCLUDED.body,
+			published_at = EXCLUDED.published_at,
+			collected_at = NOW()
+		RETURNING id, source_id, external_id, url, title, body, published_at, collected_at, created_at`
 	row := r.db.QueryRowContext(ctx, q, item.SourceID, item.ExternalID, item.URL, item.Title, item.Body, item.PublishedAt)
 	if err := scanSourceItem(row, &item); err != nil {
 		return domain.SourceItem{}, fmt.Errorf("create source item: %w", err)

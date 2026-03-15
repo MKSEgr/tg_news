@@ -70,6 +70,13 @@ func (a *App) Run() error {
 		}
 	case <-ctx.Done():
 		a.logger.Info("shutdown signal received", "reason", ctx.Err())
+		select {
+		case err := <-errCh:
+			if err != nil {
+				return fmt.Errorf("listen and serve: %w", err)
+			}
+		default:
+		}
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)

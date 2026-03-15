@@ -11,6 +11,7 @@ func TestValidateDSN(t *testing.T) {
 		{name: "valid", dsn: "postgres://user:pass@localhost:5432/app", wantErr: false},
 		{name: "invalid scheme", dsn: "http://localhost:5432/app", wantErr: true},
 		{name: "missing host", dsn: "postgres:///app", wantErr: true},
+		{name: "empty hostname with port", dsn: "postgres://:5432/app", wantErr: true},
 		{name: "missing db", dsn: "postgres://localhost:5432", wantErr: true},
 	}
 

@@ -16,7 +16,7 @@ func ValidateDSN(dsn string) error {
 		return fmt.Errorf("unsupported postgres scheme: %q", parsed.Scheme)
 	}
 
-	if parsed.Host == "" {
+	if parsed.Hostname() == "" {
 		return fmt.Errorf("postgres host is required")
 	}
 
