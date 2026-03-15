@@ -29,3 +29,4 @@
 - MVP-019 completed: added normalizer service for canonical URL and text normalization with validation and unit tests.
 - MVP-020 completed: added dedup service with recent-item checks (external_id/url/title), validation, and unit tests.
 - MVP-021 completed: added trend scorer service with recency+keyword scoring and unit tests.
+- MVP-022 completed: added channel router service with keyword-based routing and fallback channel selection, with unit tests.
