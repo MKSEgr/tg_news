@@ -2,6 +2,7 @@ package producthunt
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -39,6 +40,35 @@ func TestCollectHappyPath(t *testing.T) {
 	}
 	if items[0].PublishedAt == nil {
 		t.Fatalf("PublishedAt expected non-nil")
+	}
+}
+
+func TestCollectGraphQLEndpointUsesPostWithQueryPayload(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("Method = %s, want POST", r.Method)
+		}
+		if got := r.Header.Get("Content-Type"); !strings.Contains(got, "application/json") {
+			t.Fatalf("Content-Type = %q", got)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("ReadAll() error = %v", err)
+		}
+		if !strings.Contains(string(body), `"query"`) || !strings.Contains(string(body), `posts`) {
+			t.Fatalf("body = %q, expected graphql query payload", string(body))
+		}
+		_, _ = w.Write([]byte(`{"data":{"posts":{"edges":[{"node":{"id":"ph_gql_1","url":"https://www.producthunt.com/posts/tool","name":"AI Tool","tagline":"Ship faster with AI","publishedAt":"2026-03-15T10:00:00Z"}}]}}}`))
+	}))
+	defer server.Close()
+
+	collector := New(server.Client())
+	items, err := collector.Collect(context.Background(), domain.Source{Endpoint: server.URL + "/v2/api/graphql"})
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("items len = %d, want 1", len(items))
 	}
 }
 

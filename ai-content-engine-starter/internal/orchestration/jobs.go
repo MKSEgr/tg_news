@@ -34,6 +34,7 @@ type PipelineJob struct {
 	generator          draftGenerator
 	guard              draftGuard
 	topicMemory        topicMemoryReader
+	rules              contentRuleEvaluator
 	recentItemsLimit   int
 	existingDraftLimit int
 }
@@ -68,6 +69,10 @@ type draftGuard interface {
 
 type topicMemoryReader interface {
 	TopTopics(ctx context.Context, channelID int64, limit int) ([]domain.TopicMemory, error)
+}
+
+type contentRuleEvaluator interface {
+	EvaluateAllowed(ctx context.Context, channelID int64, text string) (bool, error)
 }
 
 type memoryAwareScorer interface {
@@ -120,6 +125,7 @@ func NewPipelineJob(
 	generator draftGenerator,
 	guard draftGuard,
 	topicMemory topicMemoryReader,
+	rules contentRuleEvaluator,
 ) (*PipelineJob, error) {
 	if sources == nil {
 		return nil, fmt.Errorf("source repository is nil")
@@ -164,6 +170,7 @@ func NewPipelineJob(
 		generator:          generator,
 		guard:              guard,
 		topicMemory:        topicMemory,
+		rules:              rules,
 		recentItemsLimit:   defaultRecentItemsLimit,
 		existingDraftLimit: defaultExistingLimit,
 	}, nil
@@ -250,6 +257,15 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				if !ok {
 					continue
 				}
+				if j.rules != nil {
+					allowed, err := j.rules.EvaluateAllowed(ctx, channelID, pipelineRuleText(normalized))
+					if err != nil {
+						return fmt.Errorf("evaluate content rules for channel %d: %w", channelID, err)
+					}
+					if !allowed {
+						continue
+					}
+				}
 
 				draft, err := j.generator.GenerateDraft(ctx, normalized, channel)
 				if err != nil {
@@ -274,6 +290,21 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func pipelineRuleText(item domain.SourceItem) string {
+	text := strings.TrimSpace(item.Title)
+	if item.Body != nil {
+		body := strings.TrimSpace(*item.Body)
+		if body != "" {
+			if text == "" {
+				text = body
+			} else {
+				text += " " + body
+			}
+		}
+	}
+	return text
 }
 
 func flattenMemory(memoryByChannel map[int64][]domain.TopicMemory) []domain.TopicMemory {

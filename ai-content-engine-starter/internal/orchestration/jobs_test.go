@@ -126,6 +126,25 @@ type guardStub struct{ result editorial.Result }
 
 func (g *guardStub) Check(domain.Draft) (editorial.Result, error) { return g.result, nil }
 
+type rulesStub struct {
+	allowByChannel map[int64]bool
+	err            error
+}
+
+func (r *rulesStub) EvaluateAllowed(_ context.Context, channelID int64, _ string) (bool, error) {
+	if r.err != nil {
+		return false, r.err
+	}
+	if r.allowByChannel == nil {
+		return true, nil
+	}
+	allowed, ok := r.allowByChannel[channelID]
+	if !ok {
+		return true, nil
+	}
+	return allowed, nil
+}
+
 func TestCollectorJobRun(t *testing.T) {
 	job, err := NewCollectorJob(&collectorStub{})
 	if err != nil {
@@ -153,6 +172,7 @@ func TestPipelineJobRunCreatesDraft(t *testing.T) {
 		&routerStub{ids: []int64{7}},
 		&generatorStub{draft: generated},
 		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
 		nil,
 	)
 	if err != nil {
@@ -190,6 +210,7 @@ func TestPipelineJobRunSkipsDuplicate(t *testing.T) {
 		&generatorStub{draft: generated},
 		&guardStub{result: editorial.Result{Accepted: true}},
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewPipelineJob() error = %v", err)
@@ -222,6 +243,7 @@ func TestPipelineJobRunStoresRejectedDraft(t *testing.T) {
 		&generatorStub{draft: generated},
 		&guardStub{result: editorial.Result{Accepted: false}},
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewPipelineJob() error = %v", err)
@@ -250,6 +272,7 @@ func TestPipelineJobRunReturnsUpstreamError(t *testing.T) {
 		&routerStub{},
 		&generatorStub{},
 		&guardStub{},
+		nil,
 		nil,
 	)
 	if err != nil {
@@ -282,6 +305,7 @@ func TestPipelineJobRunSkipsWhenRejectedDraftAlreadyExists(t *testing.T) {
 		&generatorStub{draft: generated},
 		&guardStub{result: editorial.Result{Accepted: true}},
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewPipelineJob() error = %v", err)
@@ -292,6 +316,66 @@ func TestPipelineJobRunSkipsWhenRejectedDraftAlreadyExists(t *testing.T) {
 	}
 	if len(drafts.created) != 0 {
 		t.Fatalf("created drafts = %d, want 0 when rejected draft already exists", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunSkipsDraftWhenRuleBlocksChannel(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		&rulesStub{allowByChannel: map[int64]bool{7: false}},
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.created) != 0 {
+		t.Fatalf("created drafts = %d, want 0", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunReturnsRuleEvaluationError(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		&draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}},
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		&rulesStub{err: errors.New("rules db down")},
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+
+	if err := job.Run(context.Background()); err == nil {
+		t.Fatalf("expected error")
 	}
 }
 
@@ -321,34 +405,34 @@ func TestNewPipelineJobValidation(t *testing.T) {
 	validGenerator := &generatorStub{}
 	validGuard := &guardStub{}
 
-	if _, err := NewPipelineJob(nil, validItems, validChannels, validDrafts, validNormalizer, validDedup, validScorer, validRouter, validGenerator, validGuard, nil); err == nil {
+	if _, err := NewPipelineJob(nil, validItems, validChannels, validDrafts, validNormalizer, validDedup, validScorer, validRouter, validGenerator, validGuard, nil, nil); err == nil {
 		t.Fatalf("expected error for nil sources")
 	}
-	if _, err := NewPipelineJob(validSources, nil, validChannels, validDrafts, validNormalizer, validDedup, validScorer, validRouter, validGenerator, validGuard, nil); err == nil {
+	if _, err := NewPipelineJob(validSources, nil, validChannels, validDrafts, validNormalizer, validDedup, validScorer, validRouter, validGenerator, validGuard, nil, nil); err == nil {
 		t.Fatalf("expected error for nil items")
 	}
-	if _, err := NewPipelineJob(validSources, validItems, nil, validDrafts, validNormalizer, validDedup, validScorer, validRouter, validGenerator, validGuard, nil); err == nil {
+	if _, err := NewPipelineJob(validSources, validItems, nil, validDrafts, validNormalizer, validDedup, validScorer, validRouter, validGenerator, validGuard, nil, nil); err == nil {
 		t.Fatalf("expected error for nil channels")
 	}
-	if _, err := NewPipelineJob(validSources, validItems, validChannels, nil, validNormalizer, validDedup, validScorer, validRouter, validGenerator, validGuard, nil); err == nil {
+	if _, err := NewPipelineJob(validSources, validItems, validChannels, nil, validNormalizer, validDedup, validScorer, validRouter, validGenerator, validGuard, nil, nil); err == nil {
 		t.Fatalf("expected error for nil drafts")
 	}
-	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, nil, validDedup, validScorer, validRouter, validGenerator, validGuard, nil); err == nil {
+	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, nil, validDedup, validScorer, validRouter, validGenerator, validGuard, nil, nil); err == nil {
 		t.Fatalf("expected error for nil normalizer")
 	}
-	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, validNormalizer, nil, validScorer, validRouter, validGenerator, validGuard, nil); err == nil {
+	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, validNormalizer, nil, validScorer, validRouter, validGenerator, validGuard, nil, nil); err == nil {
 		t.Fatalf("expected error for nil dedup")
 	}
-	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, validNormalizer, validDedup, nil, validRouter, validGenerator, validGuard, nil); err == nil {
+	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, validNormalizer, validDedup, nil, validRouter, validGenerator, validGuard, nil, nil); err == nil {
 		t.Fatalf("expected error for nil scorer")
 	}
-	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, validNormalizer, validDedup, validScorer, nil, validGenerator, validGuard, nil); err == nil {
+	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, validNormalizer, validDedup, validScorer, nil, validGenerator, validGuard, nil, nil); err == nil {
 		t.Fatalf("expected error for nil router")
 	}
-	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, validNormalizer, validDedup, validScorer, validRouter, nil, validGuard, nil); err == nil {
+	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, validNormalizer, validDedup, validScorer, validRouter, nil, validGuard, nil, nil); err == nil {
 		t.Fatalf("expected error for nil generator")
 	}
-	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, validNormalizer, validDedup, validScorer, validRouter, validGenerator, nil, nil); err == nil {
+	if _, err := NewPipelineJob(validSources, validItems, validChannels, validDrafts, validNormalizer, validDedup, validScorer, validRouter, validGenerator, nil, nil, nil); err == nil {
 		t.Fatalf("expected error for nil guard")
 	}
 }
@@ -365,6 +449,7 @@ func TestNewPipelineJobUsesUnboundedDraftScanLimit(t *testing.T) {
 		&routerStub{},
 		&generatorStub{},
 		&guardStub{},
+		nil,
 		nil,
 	)
 	if err != nil {
@@ -410,6 +495,7 @@ func TestPipelineJobRunValidation(t *testing.T) {
 		&routerStub{},
 		&generatorStub{},
 		&guardStub{},
+		nil,
 		nil,
 	)
 	if err != nil {

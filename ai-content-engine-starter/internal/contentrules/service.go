@@ -96,3 +96,12 @@ func (s *Service) AddRule(ctx context.Context, rule domain.ContentRule) (domain.
 	rule.Enabled = true
 	return s.repo.Create(ctx, rule)
 }
+
+// EvaluateAllowed is a minimal adapter for pipeline integration without leaking Decision type.
+func (s *Service) EvaluateAllowed(ctx context.Context, channelID int64, text string) (bool, error) {
+	decision, err := s.Evaluate(ctx, channelID, text)
+	if err != nil {
+		return false, err
+	}
+	return decision.Allowed, nil
+}

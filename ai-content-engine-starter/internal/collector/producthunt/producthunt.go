@@ -1,6 +1,7 @@
 package producthunt
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -44,11 +45,25 @@ func (c *Collector) Collect(ctx context.Context, source domain.Source) ([]domain
 	}
 	requestURL := sanitizedRequestURL(parsedURL)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL.String(), nil)
+	method := http.MethodGet
+	var requestBody io.Reader
+	if isGraphQLEndpoint(parsedURL) {
+		payload, err := json.Marshal(defaultGraphQLRequest())
+		if err != nil {
+			return nil, fmt.Errorf("marshal graphql request: %w", err)
+		}
+		method = http.MethodPost
+		requestBody = bytes.NewReader(payload)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, requestURL.String(), requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
+	if method == http.MethodPost {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	applyAuthFromEndpoint(req, parsedURL)
 
 	resp, err := c.httpClient.Do(req)
@@ -222,4 +237,19 @@ func sanitizedRequestURL(parsedURL *url.URL) *url.URL {
 	query.Del("token")
 	copyURL.RawQuery = query.Encode()
 	return &copyURL
+}
+
+type graphQLRequest struct {
+	Query string `json:"query"`
+}
+
+func defaultGraphQLRequest() graphQLRequest {
+	return graphQLRequest{Query: `query { posts { edges { node { id url name title tagline body createdAt publishedAt } } } }`}
+}
+
+func isGraphQLEndpoint(parsedURL *url.URL) bool {
+	if parsedURL == nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(parsedURL.Path), "/v2/api/graphql")
 }

@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: V2
-CURRENT_TASK: V2-005
-CURRENT_TASK_TITLE: Integrate rules into pipeline
+CURRENT_TASK: V2-006
+CURRENT_TASK_TITLE: Integrate feedback into scoring/generation/routing
 STATUS: pending
 
-LAST_COMPLETED_TASK: V2-004
+LAST_COMPLETED_TASK: V2-005
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: V2-006 Integrate feedback into scoring/generation/routing
+NEXT_TASK_HINT: V2-007 Implement A/B variants
 
 RULES:
 - execute only CURRENT_TASK

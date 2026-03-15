@@ -4,7 +4,7 @@
 - [x] V2-002 Implement blacklist/whitelist rules
 - [x] V2-003 Implement performance feedback loop
 - [x] V2-004 Integrate memory into scorer/router/editorial
-- [ ] V2-005 Integrate rules into pipeline
+- [x] V2-005 Integrate rules into pipeline
 - [ ] V2-006 Integrate feedback into scoring/generation/routing
 - [ ] V2-007 Implement A/B variants
 - [ ] V2-008 Implement variant attribution

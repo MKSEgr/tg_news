@@ -406,10 +406,6 @@ func (r *ContentRuleRepository) Create(ctx context.Context, rule domain.ContentR
 	if rule.Kind != domain.ContentRuleKindBlacklist && rule.Kind != domain.ContentRuleKindWhitelist {
 		return domain.ContentRule{}, fmt.Errorf("rule kind is invalid")
 	}
-	if !rule.Enabled {
-		rule.Enabled = true
-	}
-
 	const q = `INSERT INTO content_rules (channel_id, kind, pattern, enabled)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, channel_id, kind, pattern, enabled, created_at, updated_at`
