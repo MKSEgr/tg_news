@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	"ai-content-engine-starter/internal/domain"
 	"ai-content-engine-starter/internal/editorial"
@@ -15,6 +16,9 @@ import (
 const (
 	defaultRecentItemsLimit = 50
 	defaultExistingLimit    = math.MaxInt32
+	defaultRepostLimit      = 1
+	defaultRepostThreshold  = 1.0
+	defaultRepostCooldown   = 72 * time.Hour
 )
 
 // CollectorJob runs content collection.
@@ -39,6 +43,16 @@ type PipelineJob struct {
 	feedback           feedbackReader
 	recentItemsLimit   int
 	existingDraftLimit int
+}
+
+// AutoRepostJob promotes strong posted drafts for reposting.
+type AutoRepostJob struct {
+	drafts       domain.DraftRepository
+	feedback     feedbackReader
+	minScore     float64
+	maxPerRun    int
+	minPostedFor time.Duration
+	listLimit    int
 }
 
 type collectorRunner interface {
@@ -131,6 +145,102 @@ func (j *CollectorJob) Run(ctx context.Context) error {
 	if err := j.collector.RunOnce(ctx); err != nil {
 		return fmt.Errorf("run collector: %w", err)
 	}
+	return nil
+}
+
+// NewAutoRepostJob creates an auto-repost job with deterministic defaults.
+func NewAutoRepostJob(drafts domain.DraftRepository, feedback feedbackReader) (*AutoRepostJob, error) {
+	if drafts == nil {
+		return nil, fmt.Errorf("draft repository is nil")
+	}
+	if feedback == nil {
+		return nil, fmt.Errorf("feedback reader is nil")
+	}
+	return &AutoRepostJob{
+		drafts:       drafts,
+		feedback:     feedback,
+		minScore:     defaultRepostThreshold,
+		maxPerRun:    defaultRepostLimit,
+		minPostedFor: defaultRepostCooldown,
+		listLimit:    defaultExistingLimit,
+	}, nil
+}
+
+// Run promotes top-performing posted drafts back to approved for scheduled reposting.
+func (j *AutoRepostJob) Run(ctx context.Context) error {
+	if j == nil {
+		return fmt.Errorf("auto repost job is nil")
+	}
+	if ctx == nil {
+		return fmt.Errorf("context is nil")
+	}
+	if j.drafts == nil {
+		return fmt.Errorf("draft repository is nil")
+	}
+	if j.feedback == nil {
+		return fmt.Errorf("feedback reader is nil")
+	}
+	if j.maxPerRun <= 0 {
+		return fmt.Errorf("max per run must be greater than zero")
+	}
+	if j.listLimit <= 0 {
+		return fmt.Errorf("list limit must be greater than zero")
+	}
+
+	posted, err := j.drafts.ListByStatus(ctx, domain.DraftStatusPosted, j.listLimit)
+	if err != nil {
+		return fmt.Errorf("list posted drafts: %w", err)
+	}
+
+	now := time.Now().UTC()
+	type candidate struct {
+		draft domain.Draft
+		score float64
+	}
+	candidates := make([]candidate, 0)
+	for _, draft := range posted {
+		if draft.ID <= 0 {
+			continue
+		}
+		if j.minPostedFor > 0 && draft.UpdatedAt.IsZero() {
+			continue
+		}
+		if j.minPostedFor > 0 && now.Sub(draft.UpdatedAt.UTC()) < j.minPostedFor {
+			continue
+		}
+		feedback, err := j.feedback.GetByDraftID(ctx, draft.ID)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				continue
+			}
+			return fmt.Errorf("get feedback for draft %d: %w", draft.ID, err)
+		}
+		if feedback.Score < j.minScore {
+			continue
+		}
+		candidates = append(candidates, candidate{draft: draft, score: feedback.Score})
+	}
+
+	sort.Slice(candidates, func(i, k int) bool {
+		if candidates[i].score == candidates[k].score {
+			if candidates[i].draft.UpdatedAt.Equal(candidates[k].draft.UpdatedAt) {
+				return candidates[i].draft.ID < candidates[k].draft.ID
+			}
+			return candidates[i].draft.UpdatedAt.Before(candidates[k].draft.UpdatedAt)
+		}
+		return candidates[i].score > candidates[k].score
+	})
+
+	limit := j.maxPerRun
+	if limit > len(candidates) {
+		limit = len(candidates)
+	}
+	for i := 0; i < limit; i++ {
+		if err := j.drafts.UpdateStatus(ctx, candidates[i].draft.ID, domain.DraftStatusApproved); err != nil {
+			return fmt.Errorf("promote draft %d for repost: %w", candidates[i].draft.ID, err)
+		}
+	}
+
 	return nil
 }
 

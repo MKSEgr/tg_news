@@ -49,3 +49,4 @@
 - V2-006 completed: integrated performance feedback into pipeline scoring/routing/generation through optional feedback-aware interfaces and channel feedback averages with focused tests.
 - V2-007 completed: implemented deterministic A/B draft variants (schema + domain + repositories + generator + orchestration integration) with focused tests.
 - V2-008 completed: added variant attribution to performance feedback persistence (migration + domain/repository updates) with focused validation coverage.
+- V2-009 completed: added deterministic auto-repost orchestration job that promotes high-performing posted drafts back to approved with cooldown/threshold limits and focused tests.

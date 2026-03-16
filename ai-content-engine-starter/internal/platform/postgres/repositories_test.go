@@ -94,3 +94,24 @@ func TestPerformanceFeedbackRepositoryRejectsInvalidInput(t *testing.T) {
 		t.Fatalf("GetByDraftID expected validation error")
 	}
 }
+
+func TestNormalizeFeedbackVariant(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty", in: "", want: ""},
+		{name: "spaces", in: "   ", want: ""},
+		{name: "lower a", in: "a", want: "A"},
+		{name: "mixed b", in: " b ", want: "B"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := normalizeFeedbackVariant(tc.in); got != tc.want {
+				t.Fatalf("normalizeFeedbackVariant(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}

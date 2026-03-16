@@ -475,8 +475,8 @@ func (r *PerformanceFeedbackRepository) Upsert(ctx context.Context, feedback dom
 	if feedback.Score < 0 || math.IsNaN(feedback.Score) || math.IsInf(feedback.Score, 0) {
 		return domain.PerformanceFeedback{}, fmt.Errorf("feedback score is invalid")
 	}
-	feedback.Variant = normalizeABVariant(feedback.Variant)
-	if feedback.Variant != "A" && feedback.Variant != "B" {
+	feedback.Variant = normalizeFeedbackVariant(feedback.Variant)
+	if feedback.Variant != "" && feedback.Variant != "A" && feedback.Variant != "B" {
 		return domain.PerformanceFeedback{}, fmt.Errorf("feedback variant is invalid")
 	}
 
@@ -519,12 +519,8 @@ func (r *PerformanceFeedbackRepository) GetByDraftID(ctx context.Context, draftI
 	return feedback, nil
 }
 
-func normalizeABVariant(raw string) string {
-	value := strings.ToUpper(strings.TrimSpace(raw))
-	if value == "" {
-		return "A"
-	}
-	return value
+func normalizeFeedbackVariant(raw string) string {
+	return strings.ToUpper(strings.TrimSpace(raw))
 }
 
 type sourceItemScanner interface {

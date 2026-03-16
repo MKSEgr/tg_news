@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"ai-content-engine-starter/internal/domain"
 	"ai-content-engine-starter/internal/editorial"
@@ -72,6 +73,8 @@ type draftRepoStub struct {
 	byStatus  map[domain.DraftStatus][]domain.Draft
 	createErr error
 	listErr   error
+	updateErr error
+	updated   map[int64]domain.DraftStatus
 }
 
 func (s *draftRepoStub) Create(_ context.Context, d domain.Draft) (domain.Draft, error) {
@@ -90,7 +93,16 @@ func (s *draftRepoStub) ListByStatus(_ context.Context, status domain.DraftStatu
 	}
 	return s.byStatus[status], nil
 }
-func (s *draftRepoStub) UpdateStatus(context.Context, int64, domain.DraftStatus) error { return nil }
+func (s *draftRepoStub) UpdateStatus(_ context.Context, id int64, status domain.DraftStatus) error {
+	if s.updateErr != nil {
+		return s.updateErr
+	}
+	if s.updated == nil {
+		s.updated = make(map[int64]domain.DraftStatus)
+	}
+	s.updated[id] = status
+	return nil
+}
 
 type normalizerStub struct{ item domain.SourceItem }
 
@@ -825,5 +837,109 @@ func TestPipelineJobRunValidation(t *testing.T) {
 	}
 	if err := job.Run(nil); err == nil {
 		t.Fatalf("expected error for nil context")
+	}
+}
+
+func TestNewAutoRepostJobValidation(t *testing.T) {
+	if _, err := NewAutoRepostJob(nil, &feedbackRepoStub{}); err == nil {
+		t.Fatalf("expected nil draft repository error")
+	}
+	if _, err := NewAutoRepostJob(&draftRepoStub{}, nil); err == nil {
+		t.Fatalf("expected nil feedback reader error")
+	}
+}
+
+func TestAutoRepostJobRunPromotesTopEligibleDrafts(t *testing.T) {
+	now := time.Now().UTC()
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{
+		domain.DraftStatusPosted: {
+			{ID: 1, Status: domain.DraftStatusPosted, UpdatedAt: now.Add(-96 * time.Hour)},
+			{ID: 2, Status: domain.DraftStatusPosted, UpdatedAt: now.Add(-120 * time.Hour)},
+			{ID: 3, Status: domain.DraftStatusPosted, UpdatedAt: now.Add(-10 * time.Hour)},
+		},
+	}}
+	feedback := &feedbackRepoStub{byDraft: map[int64]domain.PerformanceFeedback{
+		1: {DraftID: 1, Score: 1.1},
+		2: {DraftID: 2, Score: 2.0},
+		3: {DraftID: 3, Score: 3.0},
+	}}
+
+	job, err := NewAutoRepostJob(drafts, feedback)
+	if err != nil {
+		t.Fatalf("NewAutoRepostJob() error = %v", err)
+	}
+	job.maxPerRun = 2
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.updated) != 2 {
+		t.Fatalf("updated drafts = %d, want 2", len(drafts.updated))
+	}
+	if drafts.updated[2] != domain.DraftStatusApproved {
+		t.Fatalf("draft 2 status = %q, want approved", drafts.updated[2])
+	}
+	if drafts.updated[1] != domain.DraftStatusApproved {
+		t.Fatalf("draft 1 status = %q, want approved", drafts.updated[1])
+	}
+	if _, ok := drafts.updated[3]; ok {
+		t.Fatalf("draft 3 should be skipped by cooldown")
+	}
+}
+
+func TestAutoRepostJobRunValidationAndErrors(t *testing.T) {
+	job := &AutoRepostJob{}
+	if err := job.Run(nil); err == nil {
+		t.Fatalf("expected nil context error")
+	}
+
+	job.drafts = &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+	job.feedback = &feedbackRepoStub{}
+	job.maxPerRun = 0
+	job.listLimit = 1
+	if err := job.Run(context.Background()); err == nil {
+		t.Fatalf("expected invalid maxPerRun error")
+	}
+
+	job.maxPerRun = 1
+	job.listLimit = 0
+	if err := job.Run(context.Background()); err == nil {
+		t.Fatalf("expected invalid listLimit error")
+	}
+
+	job.listLimit = 1
+	job.drafts = &draftRepoStub{listErr: errors.New("boom")}
+	if err := job.Run(context.Background()); err == nil {
+		t.Fatalf("expected list error")
+	}
+
+	job.drafts = &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{
+		domain.DraftStatusPosted: {{ID: 10}},
+	}}
+	job.feedback = &feedbackRepoStub{byDraft: map[int64]domain.PerformanceFeedback{10: {DraftID: 10, Score: 5.0}}}
+	job.maxPerRun = 1
+	job.listLimit = 1
+	job.minPostedFor = time.Hour
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(job.drafts.(*draftRepoStub).updated) != 0 {
+		t.Fatalf("draft with zero updated_at should be skipped by cooldown")
+	}
+
+	job.drafts = &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{
+		domain.DraftStatusPosted: {{ID: 9, UpdatedAt: time.Now().UTC().Add(-96 * time.Hour)}},
+	}}
+	job.feedback = &feedbackRepoStub{err: errors.New("boom")}
+	if err := job.Run(context.Background()); err == nil {
+		t.Fatalf("expected feedback error")
+	}
+
+	job.feedback = &feedbackRepoStub{byDraft: map[int64]domain.PerformanceFeedback{9: {DraftID: 9, Score: 2.0}}}
+	job.drafts = &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{
+		domain.DraftStatusPosted: {{ID: 9, UpdatedAt: time.Now().UTC().Add(-96 * time.Hour)}},
+	}, updateErr: errors.New("boom")}
+	if err := job.Run(context.Background()); err == nil {
+		t.Fatalf("expected update error")
 	}
 }
