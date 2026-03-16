@@ -85,3 +85,13 @@ func TestScoreWithMemoryAddsDeterministicBoost(t *testing.T) {
 		t.Fatalf("withMemory=%d, withoutMemory=%d, want boost", withMemory, withoutMemory)
 	}
 }
+
+func TestScoreWithFeedbackUsesChannelPrior(t *testing.T) {
+	now := time.Date(2026, 3, 15, 12, 0, 0, 0, time.UTC)
+	svc := New(func() time.Time { return now })
+	base := svc.Score(domain.SourceItem{Title: "AI update"})
+	withFeedback := svc.ScoreWithFeedback(domain.SourceItem{Title: "AI update"}, map[int64]float64{1: 2.0, 2: 1.0})
+	if withFeedback <= base {
+		t.Fatalf("withFeedback=%d, base=%d, want feedback boost", withFeedback, base)
+	}
+}

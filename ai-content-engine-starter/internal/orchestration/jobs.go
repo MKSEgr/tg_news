@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -35,6 +36,7 @@ type PipelineJob struct {
 	guard              draftGuard
 	topicMemory        topicMemoryReader
 	rules              contentRuleEvaluator
+	feedback           feedbackReader
 	recentItemsLimit   int
 	existingDraftLimit int
 }
@@ -73,6 +75,22 @@ type topicMemoryReader interface {
 
 type contentRuleEvaluator interface {
 	EvaluateAllowed(ctx context.Context, channelID int64, text string) (bool, error)
+}
+
+type feedbackReader interface {
+	GetByDraftID(ctx context.Context, draftID int64) (domain.PerformanceFeedback, error)
+}
+
+type feedbackAwareScorer interface {
+	ScoreWithFeedback(item domain.SourceItem, feedbackByChannel map[int64]float64) int
+}
+
+type feedbackAwareRouter interface {
+	RouteWithFeedback(item domain.SourceItem, channels []domain.Channel, feedbackByChannel map[int64]float64) ([]int64, error)
+}
+
+type feedbackAwareGenerator interface {
+	GenerateDraftWithFeedback(ctx context.Context, item domain.SourceItem, channel domain.Channel, channelFeedback float64) (domain.Draft, error)
 }
 
 type memoryAwareScorer interface {
@@ -126,6 +144,7 @@ func NewPipelineJob(
 	guard draftGuard,
 	topicMemory topicMemoryReader,
 	rules contentRuleEvaluator,
+	feedback feedbackReader,
 ) (*PipelineJob, error) {
 	if sources == nil {
 		return nil, fmt.Errorf("source repository is nil")
@@ -171,6 +190,7 @@ func NewPipelineJob(
 		guard:              guard,
 		topicMemory:        topicMemory,
 		rules:              rules,
+		feedback:           feedback,
 		recentItemsLimit:   defaultRecentItemsLimit,
 		existingDraftLimit: defaultExistingLimit,
 	}, nil
@@ -207,6 +227,11 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 		memoryByChannel[channel.ID] = topics
 	}
 
+	feedbackByChannel, err := j.channelFeedbackAverages(ctx)
+	if err != nil {
+		return err
+	}
+
 	existing, err := j.existingDraftKeys(ctx)
 	if err != nil {
 		return err
@@ -236,6 +261,9 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 			if memoryScorer, ok := j.scorer.(memoryAwareScorer); ok {
 				score = memoryScorer.ScoreWithMemory(normalized, flattenMemory(memoryByChannel))
 			}
+			if feedbackScorer, ok := j.scorer.(feedbackAwareScorer); ok {
+				score = feedbackScorer.ScoreWithFeedback(normalized, feedbackByChannel)
+			}
 			if score <= 0 {
 				continue
 			}
@@ -243,6 +271,9 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 			targetIDs, err := j.router.Route(normalized, channels)
 			if memoryRouter, ok := j.router.(memoryAwareRouter); ok {
 				targetIDs, err = memoryRouter.RouteWithMemory(normalized, channels, memoryByChannel)
+			}
+			if feedbackRouter, ok := j.router.(feedbackAwareRouter); ok {
+				targetIDs, err = feedbackRouter.RouteWithFeedback(normalized, channels, feedbackByChannel)
 			}
 			if err != nil {
 				return fmt.Errorf("route item %d: %w", item.ID, err)
@@ -268,6 +299,9 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				}
 
 				draft, err := j.generator.GenerateDraft(ctx, normalized, channel)
+				if feedbackGenerator, ok := j.generator.(feedbackAwareGenerator); ok {
+					draft, err = feedbackGenerator.GenerateDraftWithFeedback(ctx, normalized, channel, feedbackByChannel[channelID])
+				}
 				if err != nil {
 					return fmt.Errorf("generate draft for item %d, channel %d: %w", normalized.ID, channelID, err)
 				}
@@ -332,6 +366,41 @@ func flattenMemory(memoryByChannel map[int64][]domain.TopicMemory) []domain.Topi
 		out = append(out, topics...)
 	}
 	return out
+}
+
+func (j *PipelineJob) channelFeedbackAverages(ctx context.Context) (map[int64]float64, error) {
+	out := make(map[int64]float64)
+	if j.feedback == nil {
+		return out, nil
+	}
+
+	posted, err := j.drafts.ListByStatus(ctx, domain.DraftStatusPosted, j.existingDraftLimit)
+	if err != nil {
+		return nil, fmt.Errorf("list posted drafts: %w", err)
+	}
+	totals := make(map[int64]float64)
+	counts := make(map[int64]int)
+	for _, draft := range posted {
+		if draft.ID <= 0 || draft.ChannelID <= 0 {
+			continue
+		}
+		feedback, err := j.feedback.GetByDraftID(ctx, draft.ID)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				continue
+			}
+			return nil, fmt.Errorf("get feedback for draft %d: %w", draft.ID, err)
+		}
+		totals[draft.ChannelID] += feedback.Score
+		counts[draft.ChannelID]++
+	}
+	for channelID, total := range totals {
+		count := counts[channelID]
+		if count > 0 {
+			out[channelID] = total / float64(count)
+		}
+	}
+	return out, nil
 }
 
 type draftKey struct {

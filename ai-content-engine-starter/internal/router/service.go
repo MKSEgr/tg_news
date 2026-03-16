@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"ai-content-engine-starter/internal/domain"
@@ -106,6 +107,24 @@ func (s *Service) RouteWithMemory(item domain.SourceItem, channels []domain.Chan
 	}
 
 	return out, nil
+}
+
+// RouteWithFeedback returns channels ordered by historical feedback strength (desc) for deterministic prioritization.
+func (s *Service) RouteWithFeedback(item domain.SourceItem, channels []domain.Channel, feedbackByChannel map[int64]float64) ([]int64, error) {
+	ids, err := s.RouteWithMemory(item, channels, nil)
+	if err != nil {
+		return nil, err
+	}
+	sorted := append([]int64(nil), ids...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		left := feedbackByChannel[sorted[i]]
+		right := feedbackByChannel[sorted[j]]
+		if left == right {
+			return sorted[i] < sorted[j]
+		}
+		return left > right
+	})
+	return sorted, nil
 }
 
 func appendUnique(ids []int64, value int64) []int64 {

@@ -90,3 +90,15 @@ func TestRouteWithMemoryAddsChannelMatch(t *testing.T) {
 		t.Fatalf("ids = %v, want [2]", ids)
 	}
 }
+
+func TestRouteWithFeedbackOrdersByChannelFeedback(t *testing.T) {
+	svc := New()
+	body := "release tool workflow"
+	ids, err := svc.RouteWithFeedback(domain.SourceItem{Title: "AI", Body: &body}, testChannels(), map[int64]float64{2: 3.0, 1: 1.0, 3: 2.0})
+	if err != nil {
+		t.Fatalf("RouteWithFeedback() error = %v", err)
+	}
+	if len(ids) == 0 || ids[0] != 2 {
+		t.Fatalf("ids = %v, want first channel with best feedback", ids)
+	}
+}

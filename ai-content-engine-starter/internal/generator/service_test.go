@@ -95,3 +95,24 @@ func TestGenerateDraftNilServiceSafety(t *testing.T) {
 		t.Fatalf("expected error for nil service")
 	}
 }
+
+func TestGenerateDraftWithFeedbackAddsPromptHint(t *testing.T) {
+	ai := &fakeAIClient{response: "Готовый текст поста"}
+	svc, err := New(ai)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	_, err = svc.GenerateDraftWithFeedback(
+		context.Background(),
+		domain.SourceItem{ID: 11, Title: "AI release", URL: "https://example.com"},
+		domain.Channel{ID: 7, Name: "AI News", Slug: "ai-news"},
+		1.5,
+	)
+	if err != nil {
+		t.Fatalf("GenerateDraftWithFeedback() error = %v", err)
+	}
+	if !strings.Contains(ai.lastPrompt, "высокий отклик") {
+		t.Fatalf("prompt = %q", ai.lastPrompt)
+	}
+}

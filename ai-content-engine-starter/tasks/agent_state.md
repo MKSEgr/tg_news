@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: V2
-CURRENT_TASK: V2-006
-CURRENT_TASK_TITLE: Integrate feedback into scoring/generation/routing
+CURRENT_TASK: V2-007
+CURRENT_TASK_TITLE: Implement A/B variants
 STATUS: pending
 
-LAST_COMPLETED_TASK: V2-005
+LAST_COMPLETED_TASK: V2-006
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: V2-007 Implement A/B variants
+NEXT_TASK_HINT: V2-008 Implement variant attribution
 
 RULES:
 - execute only CURRENT_TASK

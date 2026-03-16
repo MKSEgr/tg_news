@@ -14,6 +14,7 @@ const (
 	maxRecencyPoints   = 60
 	maxRelevancePoints = 40
 	maxMemoryPoints    = 20
+	maxFeedbackPoints  = 15
 )
 
 // Service calculates a simple trend score for normalized source items.
@@ -97,6 +98,20 @@ func scoreRelevance(title string, body *string) int {
 	return points
 }
 
+// ScoreWithFeedback applies deterministic score plus lightweight channel-performance prior.
+func (s *Service) ScoreWithFeedback(item domain.SourceItem, feedbackByChannel map[int64]float64) int {
+	base := s.ScoreWithMemory(item, nil)
+	adjustment := scoreFeedbackPrior(feedbackByChannel)
+	total := base + adjustment
+	if total < 0 {
+		return 0
+	}
+	if total > maxScore {
+		return maxScore
+	}
+	return total
+}
+
 func scoreMemoryRelevance(title string, body *string, memories []domain.TopicMemory) int {
 	if len(memories) == 0 {
 		return 0
@@ -121,6 +136,30 @@ func scoreMemoryRelevance(title string, body *string, memories []domain.TopicMem
 		if points >= maxMemoryPoints {
 			return maxMemoryPoints
 		}
+	}
+	return points
+}
+
+func scoreFeedbackPrior(feedbackByChannel map[int64]float64) int {
+	if len(feedbackByChannel) == 0 {
+		return 0
+	}
+	total := 0.0
+	count := 0
+	for _, score := range feedbackByChannel {
+		total += score
+		count++
+	}
+	if count == 0 {
+		return 0
+	}
+	avg := total / float64(count)
+	points := int(math.Round(avg * 4))
+	if points > maxFeedbackPoints {
+		return maxFeedbackPoints
+	}
+	if points < -maxFeedbackPoints {
+		return -maxFeedbackPoints
 	}
 	return points
 }
