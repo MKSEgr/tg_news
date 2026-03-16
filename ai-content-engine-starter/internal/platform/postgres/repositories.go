@@ -286,9 +286,9 @@ func (r *DraftRepository) Create(ctx context.Context, draft domain.Draft) (domai
 		return domain.Draft{}, fmt.Errorf("draft variant is invalid")
 	}
 
-	const q = `INSERT INTO drafts (source_item_id, channel_id, variant, title, body, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, source_item_id, channel_id, variant, title, body, status, created_at, updated_at`
-	row := r.db.QueryRowContext(ctx, q, draft.SourceItemID, draft.ChannelID, draft.Variant, draft.Title, draft.Body, draft.Status)
-	if err := row.Scan(&draft.ID, &draft.SourceItemID, &draft.ChannelID, &draft.Variant, &draft.Title, &draft.Body, &draft.Status, &draft.CreatedAt, &draft.UpdatedAt); err != nil {
+	const q = `INSERT INTO drafts (source_item_id, channel_id, variant, title, body, image_url, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, source_item_id, channel_id, variant, title, body, image_url, status, created_at, updated_at`
+	row := r.db.QueryRowContext(ctx, q, draft.SourceItemID, draft.ChannelID, draft.Variant, draft.Title, draft.Body, draft.ImageURL, draft.Status)
+	if err := row.Scan(&draft.ID, &draft.SourceItemID, &draft.ChannelID, &draft.Variant, &draft.Title, &draft.Body, &draft.ImageURL, &draft.Status, &draft.CreatedAt, &draft.UpdatedAt); err != nil {
 		return domain.Draft{}, fmt.Errorf("create draft: %w", err)
 	}
 	return draft, nil
@@ -299,10 +299,10 @@ func (r *DraftRepository) GetByID(ctx context.Context, id int64) (domain.Draft, 
 		return domain.Draft{}, err
 	}
 
-	const q = `SELECT id, source_item_id, channel_id, variant, title, body, status, created_at, updated_at FROM drafts WHERE id = $1`
+	const q = `SELECT id, source_item_id, channel_id, variant, title, body, image_url, status, created_at, updated_at FROM drafts WHERE id = $1`
 	var draft domain.Draft
 	row := r.db.QueryRowContext(ctx, q, id)
-	if err := row.Scan(&draft.ID, &draft.SourceItemID, &draft.ChannelID, &draft.Variant, &draft.Title, &draft.Body, &draft.Status, &draft.CreatedAt, &draft.UpdatedAt); err != nil {
+	if err := row.Scan(&draft.ID, &draft.SourceItemID, &draft.ChannelID, &draft.Variant, &draft.Title, &draft.Body, &draft.ImageURL, &draft.Status, &draft.CreatedAt, &draft.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Draft{}, domain.ErrNotFound
 		}
@@ -320,7 +320,7 @@ func (r *DraftRepository) ListByStatus(ctx context.Context, status domain.DraftS
 		return nil, fmt.Errorf("limit must be greater than zero")
 	}
 
-	const q = `SELECT id, source_item_id, channel_id, variant, title, body, status, created_at, updated_at FROM drafts WHERE status = $1 ORDER BY created_at DESC LIMIT $2`
+	const q = `SELECT id, source_item_id, channel_id, variant, title, body, image_url, status, created_at, updated_at FROM drafts WHERE status = $1 ORDER BY created_at DESC LIMIT $2`
 	rows, err := r.db.QueryContext(ctx, q, status, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list drafts by status: %w", err)
@@ -330,7 +330,7 @@ func (r *DraftRepository) ListByStatus(ctx context.Context, status domain.DraftS
 	drafts := make([]domain.Draft, 0)
 	for rows.Next() {
 		var draft domain.Draft
-		if err := rows.Scan(&draft.ID, &draft.SourceItemID, &draft.ChannelID, &draft.Variant, &draft.Title, &draft.Body, &draft.Status, &draft.CreatedAt, &draft.UpdatedAt); err != nil {
+		if err := rows.Scan(&draft.ID, &draft.SourceItemID, &draft.ChannelID, &draft.Variant, &draft.Title, &draft.Body, &draft.ImageURL, &draft.Status, &draft.CreatedAt, &draft.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan draft: %w", err)
 		}
 		drafts = append(drafts, draft)

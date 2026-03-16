@@ -109,7 +109,9 @@ func (a *App) routes() http.Handler {
 		_ = adminHandler.Register(mux)
 	}
 
-	_ = webui.Register(mux)
+	if a != nil && a.cfg.Features.WebUI {
+		_ = webui.Register(mux)
+	}
 	return mux
 }
 

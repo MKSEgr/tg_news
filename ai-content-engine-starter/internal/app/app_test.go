@@ -2,6 +2,8 @@ package app
 
 import (
 	"net/http"
+
+	"ai-content-engine-starter/internal/platform/config"
 	"net/http/httptest"
 	"testing"
 )
@@ -35,7 +37,7 @@ func TestHealthHandlerMethodNotAllowed(t *testing.T) {
 }
 
 func TestRoutesServeWebUIRoot(t *testing.T) {
-	a := &App{}
+	a := &App{cfg: config.Config{Features: config.FeatureFlags{WebUI: true}}}
 	h := a.routes()
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -44,6 +46,19 @@ func TestRoutesServeWebUIRoot(t *testing.T) {
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusOK)
+	}
+}
+
+func TestRoutesDoNotServeWebUIWhenDisabled(t *testing.T) {
+	a := &App{}
+	h := a.routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusNotFound)
 	}
 }
 
