@@ -59,3 +59,16 @@ func TestRoutesHealthMethodNotAllowed(t *testing.T) {
 		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusMethodNotAllowed)
 	}
 }
+
+func TestRoutesAdminDraftsIsRegistered(t *testing.T) {
+	a := &App{}
+	h := a.routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/drafts", nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusInternalServerError)
+	}
+}

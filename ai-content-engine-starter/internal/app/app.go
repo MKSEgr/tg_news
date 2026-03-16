@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"ai-content-engine-starter/internal/admin"
+	"ai-content-engine-starter/internal/domain"
 	"ai-content-engine-starter/internal/platform/config"
 	"ai-content-engine-starter/internal/platform/logger"
 	"ai-content-engine-starter/internal/platform/postgres"
@@ -94,8 +96,33 @@ func (a *App) Run() error {
 func (a *App) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
+
+	adminHandler, err := admin.NewHandler(adminFallbackDraftRepository{})
+	if err == nil {
+		_ = adminHandler.Register(mux)
+	}
+
 	_ = webui.Register(mux)
 	return mux
+}
+
+// adminFallbackDraftRepository keeps admin endpoints reachable even when storage wiring is not yet configured.
+type adminFallbackDraftRepository struct{}
+
+func (adminFallbackDraftRepository) Create(context.Context, domain.Draft) (domain.Draft, error) {
+	return domain.Draft{}, errors.New("draft repository is unavailable")
+}
+
+func (adminFallbackDraftRepository) GetByID(context.Context, int64) (domain.Draft, error) {
+	return domain.Draft{}, errors.New("draft repository is unavailable")
+}
+
+func (adminFallbackDraftRepository) ListByStatus(context.Context, domain.DraftStatus, int) ([]domain.Draft, error) {
+	return nil, errors.New("draft repository is unavailable")
+}
+
+func (adminFallbackDraftRepository) UpdateStatus(context.Context, int64, domain.DraftStatus) error {
+	return errors.New("draft repository is unavailable")
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {

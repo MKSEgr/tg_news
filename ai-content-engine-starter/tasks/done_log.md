@@ -54,3 +54,4 @@
 - V2-011 completed: added minimal Telegram admin-bot command service (/pending, /approve, /reject, /help) with chat allowlist, deterministic formatting, and focused tests.
 - V2-012 completed: added basic web UI root page with quick links to health and moderation endpoints, route wiring in app, and focused handler tests plus screenshot artifact.
 - V2-013 completed: added deterministic image enrichment service (direct URL/markdown/html/body URL heuristics), optional pipeline integration hook, SourceItem image URL field, and focused tests.
+- V2-014 completed: extended Telegram publisher to post image drafts via sendPhoto when image URL is present, propagated image URL into created drafts in pipeline, and added focused tests.

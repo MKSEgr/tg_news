@@ -330,6 +330,9 @@ func TestPipelineJobRunAppliesImageEnrichment(t *testing.T) {
 	if len(drafts.created) != 1 {
 		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
 	}
+	if drafts.created[0].ImageURL == nil || *drafts.created[0].ImageURL != imageURL {
+		t.Fatalf("draft image url not propagated")
+	}
 }
 
 func TestPipelineJobRunReturnsErrorWhenImageEnrichmentFails(t *testing.T) {

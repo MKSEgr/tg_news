@@ -52,6 +52,7 @@ type Draft struct {
 	Variant      string
 	Title        string
 	Body         string
+	ImageURL     *string
 	Status       DraftStatus
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

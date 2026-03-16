@@ -466,6 +466,7 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				}
 
 				for _, draft := range variants {
+					draft.ImageURL = normalized.ImageURL
 					variant := normalizeVariant(draft.Variant)
 					variantKey := draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: variant}
 					if _, ok := existing[variantKey]; ok {

@@ -50,6 +50,49 @@ func TestPublishDraftHappyPath(t *testing.T) {
 	}
 }
 
+func TestPublishDraftPhotoHappyPath(t *testing.T) {
+	imageURL := "https://cdn.example.com/photo.jpg"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method = %s", r.Method)
+		}
+		if !strings.Contains(r.URL.Path, "/sendPhoto") {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+
+		var req sendPhotoRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if req.ChatID != "@ai_news" {
+			t.Fatalf("chat_id = %q", req.ChatID)
+		}
+		if req.Photo != imageURL {
+			t.Fatalf("photo = %q", req.Photo)
+		}
+		if req.Caption != "hello" {
+			t.Fatalf("caption = %q", req.Caption)
+		}
+
+		_, _ = w.Write([]byte(`{"ok":true,"result":{"message_id":43}}`))
+	}))
+	defer server.Close()
+
+	client, err := New(server.Client(), "token")
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	client.baseURL = server.URL
+
+	messageID, err := client.PublishDraft(context.Background(), domain.Draft{ID: 1, Body: "hello", ImageURL: &imageURL, Status: domain.DraftStatusApproved}, "@ai_news")
+	if err != nil {
+		t.Fatalf("PublishDraft() error = %v", err)
+	}
+	if messageID != 43 {
+		t.Fatalf("messageID = %d", messageID)
+	}
+}
+
 func TestPublishDraftValidationAndErrors(t *testing.T) {
 	if _, err := New(nil, ""); err == nil {
 		t.Fatalf("New() expected bot token error")
@@ -74,6 +117,10 @@ func TestPublishDraftValidationAndErrors(t *testing.T) {
 	}
 	if _, err := client.PublishDraft(context.Background(), domain.Draft{ID: 1, Body: "x", Status: domain.DraftStatusApproved}, ""); err == nil {
 		t.Fatalf("expected empty chat id error")
+	}
+	invalidImageURL := "ftp://example.com/pic.jpg"
+	if _, err := client.PublishDraft(context.Background(), domain.Draft{ID: 1, Body: "x", ImageURL: &invalidImageURL, Status: domain.DraftStatusApproved}, "@ai_news"); err == nil {
+		t.Fatalf("expected invalid image url error")
 	}
 
 	var nilClient *Client
