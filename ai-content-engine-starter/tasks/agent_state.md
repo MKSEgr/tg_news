@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: V2
-CURRENT_TASK: V2-011
-CURRENT_TASK_TITLE: Implement Telegram admin bot
+CURRENT_TASK: V2-012
+CURRENT_TASK_TITLE: Implement basic web UI
 STATUS: pending
 
-LAST_COMPLETED_TASK: V2-010
+LAST_COMPLETED_TASK: V2-011
 LAST_COMPLETED_AT: 2026-03-16
 
-NEXT_TASK_HINT: V2-012 Implement basic web UI
+NEXT_TASK_HINT: V2-013 Implement image enrichment
 
 RULES:
 - execute only CURRENT_TASK

@@ -10,7 +10,7 @@
 - [x] V2-008 Implement variant attribution
 - [x] V2-009 Implement auto repost
 - [x] V2-010 Implement per-channel analytics
-- [ ] V2-011 Implement Telegram admin bot
+- [x] V2-011 Implement Telegram admin bot
 - [ ] V2-012 Implement basic web UI
 - [ ] V2-013 Implement image enrichment
 - [ ] V2-014 Extend publisher for image posts
