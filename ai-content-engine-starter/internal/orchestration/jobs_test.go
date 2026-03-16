@@ -106,6 +106,22 @@ type scorerStub struct{ score int }
 
 func (s *scorerStub) Score(domain.SourceItem) int { return s.score }
 
+type advancedScorerStub struct {
+	base     int
+	memory   int
+	feedback int
+}
+
+func (s *advancedScorerStub) Score(domain.SourceItem) int { return s.base }
+
+func (s *advancedScorerStub) ScoreWithMemory(domain.SourceItem, []domain.TopicMemory) int {
+	return s.base + s.memory
+}
+
+func (s *advancedScorerStub) ScoreWithFeedback(domain.SourceItem, map[int64]float64) int {
+	return s.base + s.feedback
+}
+
 type routerStub struct{ ids []int64 }
 
 func (r *routerStub) Route(domain.SourceItem, []domain.Channel) ([]int64, error) { return r.ids, nil }
@@ -238,6 +254,41 @@ func TestPipelineJobRunSkipsDuplicate(t *testing.T) {
 	}
 	if len(drafts.created) != 0 {
 		t.Fatalf("created drafts = %d, want 0 when duplicate", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunCombinesMemoryAndFeedbackScoreAdjustments(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{
+		domain.DraftStatusPosted: {{ID: 100, ChannelID: 7, Status: domain.DraftStatusPosted}},
+	}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&advancedScorerStub{base: -1, memory: 2, feedback: 1},
+		&routerStub{ids: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		&feedbackRepoStub{byDraft: map[int64]domain.PerformanceFeedback{100: {DraftID: 100, ChannelID: 7, Score: 1}}},
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.created) != 1 {
+		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
 	}
 }
 

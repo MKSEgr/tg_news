@@ -257,12 +257,14 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				continue
 			}
 
-			score := j.scorer.Score(normalized)
+			baseScore := j.scorer.Score(normalized)
+			score := baseScore
 			if memoryScorer, ok := j.scorer.(memoryAwareScorer); ok {
 				score = memoryScorer.ScoreWithMemory(normalized, flattenMemory(memoryByChannel))
 			}
 			if feedbackScorer, ok := j.scorer.(feedbackAwareScorer); ok {
-				score = feedbackScorer.ScoreWithFeedback(normalized, feedbackByChannel)
+				feedbackOnlyDelta := feedbackScorer.ScoreWithFeedback(normalized, feedbackByChannel) - baseScore
+				score += feedbackOnlyDelta
 			}
 			if score <= 0 {
 				continue
