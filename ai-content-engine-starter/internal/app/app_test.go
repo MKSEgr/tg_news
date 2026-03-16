@@ -61,14 +61,14 @@ func TestRoutesHealthMethodNotAllowed(t *testing.T) {
 }
 
 func TestRoutesAdminDraftsIsRegistered(t *testing.T) {
-	a := &App{}
+	a := &App{drafts: newAdminMemoryDraftRepository()}
 	h := a.routes()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/drafts", nil)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusInternalServerError)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusOK)
 	}
 }

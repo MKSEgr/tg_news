@@ -16,5 +16,5 @@
 - [x] V2-014 Extend publisher for image posts
 - [x] V2-015 Implement automatic source discovery
 - [x] V2-016 Integrate discovery with analytics/rules
-- [ ] V2-017 Final V2 architecture review
-- [ ] V2-018 Create rollout plan and feature flags validation
+- [x] V2-017 Final V2 architecture review
+- [x] V2-018 Create rollout plan and feature flags validation

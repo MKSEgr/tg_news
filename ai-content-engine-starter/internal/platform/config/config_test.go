@@ -26,6 +26,8 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("HTTP_PORT", "9090")
 	t.Setenv("POSTGRES_DSN", "postgres://localhost:5432/app")
 	t.Setenv("REDIS_ADDR", "localhost:6379")
+	t.Setenv("FEATURE_V2_ENABLED", "true")
+	t.Setenv("FEATURE_SOURCE_DISCOVERY", "true")
 
 	cfg, err := Load()
 	if err != nil {
@@ -43,6 +45,24 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 	if cfg.RedisAddr != "localhost:6379" {
 		t.Fatalf("RedisAddr = %q, want %q", cfg.RedisAddr, "localhost:6379")
+	}
+	if !cfg.Features.V2Enabled {
+		t.Fatalf("Features.V2Enabled = false, want true")
+	}
+	if !cfg.Features.SourceDiscovery {
+		t.Fatalf("Features.SourceDiscovery = false, want true")
+	}
+}
+
+func TestLoadFeatureFlagsRequireV2Enabled(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "postgres://localhost:5432/app")
+	t.Setenv("REDIS_ADDR", "localhost:6379")
+	t.Setenv("FEATURE_V2_ENABLED", "false")
+	t.Setenv("FEATURE_TOPIC_MEMORY", "true")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("Load() expected error when V2 feature is enabled without FEATURE_V2_ENABLED")
 	}
 }
 

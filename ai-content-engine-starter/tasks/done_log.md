@@ -57,3 +57,6 @@
 - V2-014 completed: extended Telegram publisher to post image drafts via sendPhoto when image URL is present, propagated image URL into created drafts in pipeline, and added focused tests.
 - V2-015 completed: added deterministic automatic source discovery service that derives RSS candidates from collected item URLs, excludes existing hosts/endpoints, and returns sorted capped candidates with focused tests.
 - V2-016 completed: integrated source discovery with optional analytics gating (skip discovery for channels with negative feedback average) and channel rule filtering, with focused tests.
+
+- V2-017 completed: performed final architecture review based on implemented V2 modules and architecture maps; documented critical/medium/low issues, central modules/tables, and follow-up risk focus in docs/v2_architecture_review.md.
+- V2-018 completed: added centralized V2 feature flags with validation in config, added rollout plan documentation, and updated app runtime admin composition to use an in-process draft repository instead of an always-unavailable fallback.
