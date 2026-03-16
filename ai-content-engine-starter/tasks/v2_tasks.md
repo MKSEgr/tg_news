@@ -14,7 +14,7 @@
 - [x] V2-012 Implement basic web UI
 - [x] V2-013 Implement image enrichment
 - [x] V2-014 Extend publisher for image posts
-- [ ] V2-015 Implement automatic source discovery
+- [x] V2-015 Implement automatic source discovery
 - [ ] V2-016 Integrate discovery with analytics/rules
 - [ ] V2-017 Final V2 architecture review
 - [ ] V2-018 Create rollout plan and feature flags validation
