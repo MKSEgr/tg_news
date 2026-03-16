@@ -8,7 +8,7 @@ STATUS: pending
 LAST_COMPLETED_TASK: V2-018
 LAST_COMPLETED_AT: 2026-03-16
 
-NEXT_TASK_HINT: V2 complete
+NEXT_TASK_HINT: V3-001 Implement editorial planner
 
 RULES:
 - execute only CURRENT_TASK
