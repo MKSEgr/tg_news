@@ -126,6 +126,23 @@ type routerStub struct{ ids []int64 }
 
 func (r *routerStub) Route(domain.SourceItem, []domain.Channel) ([]int64, error) { return r.ids, nil }
 
+type advancedRouterStub struct {
+	idsMemory   []int64
+	idsFeedback []int64
+}
+
+func (r *advancedRouterStub) Route(domain.SourceItem, []domain.Channel) ([]int64, error) {
+	return r.idsMemory, nil
+}
+
+func (r *advancedRouterStub) RouteWithMemory(domain.SourceItem, []domain.Channel, map[int64][]domain.TopicMemory) ([]int64, error) {
+	return r.idsMemory, nil
+}
+
+func (r *advancedRouterStub) RouteWithFeedback(domain.SourceItem, []domain.Channel, map[int64]float64) ([]int64, error) {
+	return r.idsFeedback, nil
+}
+
 type generatorStub struct {
 	draft domain.Draft
 	err   error
@@ -136,6 +153,37 @@ func (g *generatorStub) GenerateDraft(context.Context, domain.SourceItem, domain
 		return domain.Draft{}, g.err
 	}
 	return g.draft, nil
+}
+
+type variantGeneratorStub struct {
+	variants []domain.Draft
+	calls    int
+}
+
+func (g *variantGeneratorStub) GenerateDraft(context.Context, domain.SourceItem, domain.Channel) (domain.Draft, error) {
+	return domain.Draft{}, errors.New("base path should not be used")
+}
+
+func (g *variantGeneratorStub) GenerateDraftVariants(context.Context, domain.SourceItem, domain.Channel, float64) ([]domain.Draft, error) {
+	g.calls++
+	return g.variants, nil
+}
+
+type feedbackGeneratorStub struct {
+	draftBase     domain.Draft
+	draftFeedback domain.Draft
+	baseCalls     int
+	feedbackCalls int
+}
+
+func (g *feedbackGeneratorStub) GenerateDraft(context.Context, domain.SourceItem, domain.Channel) (domain.Draft, error) {
+	g.baseCalls++
+	return g.draftBase, nil
+}
+
+func (g *feedbackGeneratorStub) GenerateDraftWithFeedback(context.Context, domain.SourceItem, domain.Channel, float64) (domain.Draft, error) {
+	g.feedbackCalls++
+	return g.draftFeedback, nil
 }
 
 type guardStub struct{ result editorial.Result }
@@ -289,6 +337,161 @@ func TestPipelineJobRunCombinesMemoryAndFeedbackScoreAdjustments(t *testing.T) {
 	}
 	if len(drafts.created) != 1 {
 		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunMergesFeedbackAndMemoryRouting(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channels := []domain.Channel{{ID: 7, Slug: "ai-news", Name: "AI News"}, {ID: 8, Slug: "ai-tools", Name: "AI Tools"}}
+
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: channels},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&advancedRouterStub{idsMemory: []int64{7}, idsFeedback: []int64{8}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.created) != 2 {
+		t.Fatalf("created drafts = %d, want 2", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunUsesOnlyFeedbackAwareGeneratorCall(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+
+	gen := &feedbackGeneratorStub{
+		draftBase:     domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "base", Body: "base", Status: domain.DraftStatusPending},
+		draftFeedback: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "fb", Body: "fb", Status: domain.DraftStatusPending},
+	}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{7}},
+		gen,
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if gen.baseCalls != 0 || gen.feedbackCalls != 1 {
+		t.Fatalf("baseCalls=%d feedbackCalls=%d, want 0 and 1", gen.baseCalls, gen.feedbackCalls)
+	}
+	if len(drafts.created) != 1 || drafts.created[0].Title != "fb" {
+		t.Fatalf("created drafts = %+v", drafts.created)
+	}
+}
+
+func TestPipelineJobRunStoresABVariants(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+
+	gen := &variantGeneratorStub{variants: []domain.Draft{
+		{SourceItemID: 11, ChannelID: 7, Variant: "A", Title: "A", Body: "Body A", Status: domain.DraftStatusPending},
+		{SourceItemID: 11, ChannelID: 7, Variant: "B", Title: "B", Body: "Body B", Status: domain.DraftStatusPending},
+	}}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{7}},
+		gen,
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.created) != 2 {
+		t.Fatalf("created drafts = %d, want 2", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunSkipsVariantGenerationWhenABAlreadyExist(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+
+	gen := &variantGeneratorStub{variants: []domain.Draft{
+		{SourceItemID: 11, ChannelID: 7, Variant: "A", Title: "A", Body: "Body A", Status: domain.DraftStatusPending},
+		{SourceItemID: 11, ChannelID: 7, Variant: "B", Title: "B", Body: "Body B", Status: domain.DraftStatusPending},
+	}}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{
+		domain.DraftStatusPending: {
+			{SourceItemID: 11, ChannelID: 7, Variant: "A", Status: domain.DraftStatusPending},
+			{SourceItemID: 11, ChannelID: 7, Variant: "B", Status: domain.DraftStatusPending},
+		},
+	}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{7}},
+		gen,
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if gen.calls != 0 {
+		t.Fatalf("variant generation calls = %d, want 0", gen.calls)
+	}
+	if len(drafts.created) != 0 {
+		t.Fatalf("created drafts = %d, want 0", len(drafts.created))
 	}
 }
 
@@ -531,6 +734,13 @@ func TestNewPipelineJobUsesUnboundedDraftScanLimit(t *testing.T) {
 	}
 	if job.existingDraftLimit != defaultExistingLimit {
 		t.Fatalf("existingDraftLimit = %d, want %d", job.existingDraftLimit, defaultExistingLimit)
+	}
+}
+
+func TestMergeRankedRouteIDsPreservesFallbackMatches(t *testing.T) {
+	got := mergeRankedRouteIDs([]int64{8}, []int64{7})
+	if len(got) != 2 || got[0] != 8 || got[1] != 7 {
+		t.Fatalf("got = %v, want [8 7]", got)
 	}
 }
 

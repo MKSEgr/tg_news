@@ -14,3 +14,5 @@ Current bootstrap migration:
 - `000005_content_rules_global_uniqueness` enforces uniqueness for global (channel_id NULL) rules.
 - `000006_performance_feedback` creates PostgreSQL-backed deterministic performance feedback storage.
 
+
+- `000007_ab_variants` — adds draft variants (`A`/`B`) for deterministic A/B generation and unique source/channel/variant storage.

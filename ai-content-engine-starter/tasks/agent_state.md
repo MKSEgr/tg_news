@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: V2
-CURRENT_TASK: V2-007
-CURRENT_TASK_TITLE: Implement A/B variants
+CURRENT_TASK: V2-008
+CURRENT_TASK_TITLE: Implement variant attribution
 STATUS: pending
 
-LAST_COMPLETED_TASK: V2-006
+LAST_COMPLETED_TASK: V2-007
 LAST_COMPLETED_AT: 2026-03-15
 
-NEXT_TASK_HINT: V2-008 Implement variant attribution
+NEXT_TASK_HINT: V2-009 Implement auto repost
 
 RULES:
 - execute only CURRENT_TASK

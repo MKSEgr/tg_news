@@ -45,6 +45,9 @@ func TestGenerateDraftHappyPath(t *testing.T) {
 	if draft.Status != domain.DraftStatusPending {
 		t.Fatalf("status = %q", draft.Status)
 	}
+	if draft.Variant != "A" {
+		t.Fatalf("variant = %q, want A", draft.Variant)
+	}
 	if draft.Body != "Готовый текст поста" {
 		t.Fatalf("body = %q", draft.Body)
 	}
@@ -114,5 +117,26 @@ func TestGenerateDraftWithFeedbackAddsPromptHint(t *testing.T) {
 	}
 	if !strings.Contains(ai.lastPrompt, "высокий отклик") {
 		t.Fatalf("prompt = %q", ai.lastPrompt)
+	}
+}
+
+func TestGenerateDraftVariantsHappyPath(t *testing.T) {
+	ai := &fakeAIClient{response: "Готовый текст поста"}
+	svc, err := New(ai)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	body := "Подробности новости"
+	variants, err := svc.GenerateDraftVariants(
+		context.Background(),
+		domain.SourceItem{ID: 11, Title: "AI release", Body: &body, URL: "https://example.com"},
+		domain.Channel{ID: 7, Name: "AI News", Slug: "ai-news"},
+		0,
+	)
+	if err != nil {
+		t.Fatalf("GenerateDraftVariants() error = %v", err)
+	}
+	if len(variants) != 2 || variants[0].Variant != "A" || variants[1].Variant != "B" {
+		t.Fatalf("variants = %+v", variants)
 	}
 }

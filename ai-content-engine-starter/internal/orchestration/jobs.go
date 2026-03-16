@@ -93,6 +93,10 @@ type feedbackAwareGenerator interface {
 	GenerateDraftWithFeedback(ctx context.Context, item domain.SourceItem, channel domain.Channel, channelFeedback float64) (domain.Draft, error)
 }
 
+type variantAwareGenerator interface {
+	GenerateDraftVariants(ctx context.Context, item domain.SourceItem, channel domain.Channel, channelFeedback float64) ([]domain.Draft, error)
+}
+
 type memoryAwareScorer interface {
 	ScoreWithMemory(item domain.SourceItem, memories []domain.TopicMemory) int
 }
@@ -275,16 +279,28 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				targetIDs, err = memoryRouter.RouteWithMemory(normalized, channels, memoryByChannel)
 			}
 			if feedbackRouter, ok := j.router.(feedbackAwareRouter); ok {
-				targetIDs, err = feedbackRouter.RouteWithFeedback(normalized, channels, feedbackByChannel)
+				feedbackIDs, feedbackErr := feedbackRouter.RouteWithFeedback(normalized, channels, feedbackByChannel)
+				if feedbackErr != nil {
+					return fmt.Errorf("route item %d: %w", item.ID, feedbackErr)
+				}
+				targetIDs = mergeRankedRouteIDs(feedbackIDs, targetIDs)
 			}
 			if err != nil {
 				return fmt.Errorf("route item %d: %w", item.ID, err)
 			}
 
 			for _, channelID := range targetIDs {
-				key := draftKey{SourceItemID: normalized.ID, ChannelID: channelID}
-				if _, ok := existing[key]; ok {
-					continue
+				key := draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "A"}
+				if _, isVariantGenerator := j.generator.(variantAwareGenerator); isVariantGenerator {
+					if _, hasA := existing[draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "A"}]; hasA {
+						if _, hasB := existing[draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "B"}]; hasB {
+							continue
+						}
+					}
+				} else {
+					if _, ok := existing[key]; ok {
+						continue
+					}
 				}
 				channel, ok := channelByID[channelID]
 				if !ok {
@@ -300,32 +316,78 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 					}
 				}
 
-				draft, err := j.generator.GenerateDraft(ctx, normalized, channel)
-				if feedbackGenerator, ok := j.generator.(feedbackAwareGenerator); ok {
-					draft, err = feedbackGenerator.GenerateDraftWithFeedback(ctx, normalized, channel, feedbackByChannel[channelID])
+				variants := make([]domain.Draft, 0, 2)
+				if variantGenerator, ok := j.generator.(variantAwareGenerator); ok {
+					variants, err = variantGenerator.GenerateDraftVariants(ctx, normalized, channel, feedbackByChannel[channelID])
+					if err != nil {
+						return fmt.Errorf("generate draft variants for item %d, channel %d: %w", normalized.ID, channelID, err)
+					}
+				} else {
+					var draft domain.Draft
+					if feedbackGenerator, ok := j.generator.(feedbackAwareGenerator); ok {
+						draft, err = feedbackGenerator.GenerateDraftWithFeedback(ctx, normalized, channel, feedbackByChannel[channelID])
+					} else {
+						draft, err = j.generator.GenerateDraft(ctx, normalized, channel)
+					}
+					if err != nil {
+						return fmt.Errorf("generate draft for item %d, channel %d: %w", normalized.ID, channelID, err)
+					}
+					variants = append(variants, draft)
 				}
-				if err != nil {
-					return fmt.Errorf("generate draft for item %d, channel %d: %w", normalized.ID, channelID, err)
+
+				for _, draft := range variants {
+					variant := normalizeVariant(draft.Variant)
+					variantKey := draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: variant}
+					if _, ok := existing[variantKey]; ok {
+						continue
+					}
+					draft.Variant = variant
+					result, err := j.guard.Check(draft)
+					if memoryGuard, ok := j.guard.(memoryAwareGuard); ok {
+						result, err = memoryGuard.CheckWithMemory(draft, memoryByChannel[channelID])
+					}
+					if err != nil {
+						return fmt.Errorf("editorial guard for item %d, channel %d, variant %s: %w", normalized.ID, channelID, variant, err)
+					}
+					if !result.Accepted {
+						draft.Status = domain.DraftStatusRejected
+					}
+					if _, err := j.drafts.Create(ctx, draft); err != nil {
+						return fmt.Errorf("store draft for item %d, channel %d, variant %s: %w", normalized.ID, channelID, variant, err)
+					}
+					existing[variantKey] = struct{}{}
 				}
-				result, err := j.guard.Check(draft)
-				if memoryGuard, ok := j.guard.(memoryAwareGuard); ok {
-					result, err = memoryGuard.CheckWithMemory(draft, memoryByChannel[channelID])
-				}
-				if err != nil {
-					return fmt.Errorf("editorial guard for item %d, channel %d: %w", normalized.ID, channelID, err)
-				}
-				if !result.Accepted {
-					draft.Status = domain.DraftStatusRejected
-				}
-				if _, err := j.drafts.Create(ctx, draft); err != nil {
-					return fmt.Errorf("store draft for item %d, channel %d: %w", normalized.ID, channelID, err)
-				}
-				existing[key] = struct{}{}
 			}
 		}
 	}
 
 	return nil
+}
+
+func mergeRankedRouteIDs(primary []int64, fallback []int64) []int64 {
+	out := make([]int64, 0, len(primary)+len(fallback))
+	seen := make(map[int64]struct{}, len(primary)+len(fallback))
+	for _, id := range primary {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	for _, id := range fallback {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
 }
 
 func pipelineRuleText(item domain.SourceItem) string {
@@ -405,9 +467,18 @@ func (j *PipelineJob) channelFeedbackAverages(ctx context.Context) (map[int64]fl
 	return out, nil
 }
 
+func normalizeVariant(variant string) string {
+	value := strings.ToUpper(strings.TrimSpace(variant))
+	if value != "B" {
+		return "A"
+	}
+	return value
+}
+
 type draftKey struct {
 	SourceItemID int64
 	ChannelID    int64
+	Variant      string
 }
 
 func (j *PipelineJob) existingDraftKeys(ctx context.Context) (map[draftKey]struct{}, error) {
@@ -422,7 +493,7 @@ func (j *PipelineJob) existingDraftKeys(ctx context.Context) (map[draftKey]struc
 			if draft.SourceItemID <= 0 || draft.ChannelID <= 0 {
 				continue
 			}
-			keys[draftKey{SourceItemID: draft.SourceItemID, ChannelID: draft.ChannelID}] = struct{}{}
+			keys[draftKey{SourceItemID: draft.SourceItemID, ChannelID: draft.ChannelID, Variant: normalizeVariant(draft.Variant)}] = struct{}{}
 		}
 	}
 	return keys, nil

@@ -48,6 +48,7 @@ type Draft struct {
 	ID           int64
 	SourceItemID int64
 	ChannelID    int64
+	Variant      string
 	Title        string
 	Body         string
 	Status       DraftStatus

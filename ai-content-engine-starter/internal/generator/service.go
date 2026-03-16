@@ -73,6 +73,7 @@ func (s *Service) GenerateDraft(ctx context.Context, item domain.SourceItem, cha
 		ChannelID:    channel.ID,
 		Title:        title,
 		Body:         generated,
+		Variant:      "A",
 		Status:       domain.DraftStatusPending,
 	}, nil
 }
@@ -122,7 +123,43 @@ func (s *Service) GenerateDraftWithFeedback(ctx context.Context, item domain.Sou
 		title = string([]rune(title)[:120])
 	}
 
-	return domain.Draft{SourceItemID: item.ID, ChannelID: channel.ID, Title: title, Body: generated, Status: domain.DraftStatusPending}, nil
+	return domain.Draft{SourceItemID: item.ID, ChannelID: channel.ID, Variant: "A", Title: title, Body: generated, Status: domain.DraftStatusPending}, nil
+}
+
+// GenerateDraftVariants generates deterministic A/B draft variants for one source item and channel.
+func (s *Service) GenerateDraftVariants(ctx context.Context, item domain.SourceItem, channel domain.Channel, channelFeedback float64) ([]domain.Draft, error) {
+	variantA, err := s.GenerateDraftWithFeedback(ctx, item, channel, channelFeedback)
+	if err != nil {
+		return nil, err
+	}
+	variantA.Variant = "A"
+
+	if s == nil {
+		return nil, fmt.Errorf("generator service is nil")
+	}
+	if s.ai == nil {
+		return nil, fmt.Errorf("ai client is nil")
+	}
+	prompt := buildPrompt(item, channel)
+	if channelFeedback > 0 {
+		prompt += "\nТон: деловой и полезный; опирайся на практическую ценность, так как канал показывает высокий отклик."
+	}
+	prompt += "\nСделай альтернативный вариант B: более провокационный заголовок, но без кликбейта и без потери фактов."
+	body, err := s.ai.GenerateText(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("generate content: %w", err)
+	}
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return nil, fmt.Errorf("generated body is empty")
+	}
+	title := strings.TrimSpace(item.Title)
+	if len([]rune(title)) > 120 {
+		title = string([]rune(title)[:120])
+	}
+	variantB := domain.Draft{SourceItemID: item.ID, ChannelID: channel.ID, Variant: "B", Title: title, Body: body, Status: domain.DraftStatusPending}
+
+	return []domain.Draft{variantA, variantB}, nil
 }
 
 func buildPrompt(item domain.SourceItem, channel domain.Channel) string {

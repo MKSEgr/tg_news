@@ -47,3 +47,4 @@
 - V2-004 completed: integrated topic memory signals into scorer, router, editorial guard, and pipeline orchestration with backward-compatible optional interfaces and focused tests.
 - V2-005 completed: integrated content-rules evaluation into pipeline routing flow with optional dependency, channel-level block handling, and focused orchestration tests.
 - V2-006 completed: integrated performance feedback into pipeline scoring/routing/generation through optional feedback-aware interfaces and channel feedback averages with focused tests.
+- V2-007 completed: implemented deterministic A/B draft variants (schema + domain + repositories + generator + orchestration integration) with focused tests.
