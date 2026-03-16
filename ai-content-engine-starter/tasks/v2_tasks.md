@@ -11,7 +11,7 @@
 - [x] V2-009 Implement auto repost
 - [x] V2-010 Implement per-channel analytics
 - [x] V2-011 Implement Telegram admin bot
-- [ ] V2-012 Implement basic web UI
+- [x] V2-012 Implement basic web UI
 - [ ] V2-013 Implement image enrichment
 - [ ] V2-014 Extend publisher for image posts
 - [ ] V2-015 Implement automatic source discovery

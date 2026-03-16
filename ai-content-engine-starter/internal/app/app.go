@@ -15,6 +15,7 @@ import (
 	"ai-content-engine-starter/internal/platform/logger"
 	"ai-content-engine-starter/internal/platform/postgres"
 	"ai-content-engine-starter/internal/platform/redis"
+	"ai-content-engine-starter/internal/webui"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -93,6 +94,7 @@ func (a *App) Run() error {
 func (a *App) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
+	_ = webui.Register(mux)
 	return mux
 }
 

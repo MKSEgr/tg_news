@@ -52,3 +52,4 @@
 - V2-009 completed: added deterministic auto-repost orchestration job that promotes high-performing posted drafts back to approved with cooldown/threshold limits and focused tests.
 - V2-010 completed: added deterministic per-channel analytics service (posted/feedback counts, avg score, variant A/B averages, last posted timestamp) with focused unit tests.
 - V2-011 completed: added minimal Telegram admin-bot command service (/pending, /approve, /reject, /help) with chat allowlist, deterministic formatting, and focused tests.
+- V2-012 completed: added basic web UI root page with quick links to health and moderation endpoints, route wiring in app, and focused handler tests plus screenshot artifact.

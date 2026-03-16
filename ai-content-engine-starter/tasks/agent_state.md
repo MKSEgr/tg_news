@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: V2
-CURRENT_TASK: V2-012
-CURRENT_TASK_TITLE: Implement basic web UI
+CURRENT_TASK: V2-013
+CURRENT_TASK_TITLE: Implement image enrichment
 STATUS: pending
 
-LAST_COMPLETED_TASK: V2-011
+LAST_COMPLETED_TASK: V2-012
 LAST_COMPLETED_AT: 2026-03-16
 
-NEXT_TASK_HINT: V2-013 Implement image enrichment
+NEXT_TASK_HINT: V2-014 Extend publisher for image posts
 
 RULES:
 - execute only CURRENT_TASK
