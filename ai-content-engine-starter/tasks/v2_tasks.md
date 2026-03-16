@@ -9,7 +9,7 @@
 - [x] V2-007 Implement A/B variants
 - [x] V2-008 Implement variant attribution
 - [x] V2-009 Implement auto repost
-- [ ] V2-010 Implement per-channel analytics
+- [x] V2-010 Implement per-channel analytics
 - [ ] V2-011 Implement Telegram admin bot
 - [ ] V2-012 Implement basic web UI
 - [ ] V2-013 Implement image enrichment
