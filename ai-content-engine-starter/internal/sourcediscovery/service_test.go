@@ -3,6 +3,7 @@ package sourcediscovery
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"ai-content-engine-starter/internal/domain"
@@ -13,11 +14,44 @@ type sourceRepoStub struct {
 	err     error
 }
 
+type analyticsStub struct {
+	summaries []ChannelMetrics
+	err       error
+}
+
+func (s *analyticsStub) BuildByChannelMetrics(context.Context) ([]ChannelMetrics, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.summaries, nil
+}
+
+type rulesStub struct {
+	denySubstring string
+	err           error
+}
+
+func (r *rulesStub) EvaluateAllowed(_ context.Context, _ int64, text string) (bool, error) {
+	if r.err != nil {
+		return false, r.err
+	}
+	if r.denySubstring != "" && strings.Contains(strings.ToLower(text), strings.ToLower(r.denySubstring)) {
+		return false, nil
+	}
+	return true, nil
+}
+
 func (s *sourceRepoStub) Create(context.Context, domain.Source) (domain.Source, error) {
 	return domain.Source{}, nil
 }
 func (s *sourceRepoStub) GetByID(context.Context, int64) (domain.Source, error) {
 	return domain.Source{}, nil
+}
+func (s *sourceRepoStub) List(context.Context) ([]domain.Source, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.sources, nil
 }
 func (s *sourceRepoStub) ListEnabled(context.Context) ([]domain.Source, error) {
 	if s.err != nil {
@@ -90,5 +124,61 @@ func TestDiscoverListEnabledError(t *testing.T) {
 	}
 	if _, err := svc.Discover(context.Background(), []domain.SourceItem{{URL: "https://a.example/news"}}); err == nil {
 		t.Fatalf("expected error")
+	}
+}
+
+func TestDiscoverForChannelFiltersWithRules(t *testing.T) {
+	svc, err := New(&sourceRepoStub{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	svc.WithRules(&rulesStub{denySubstring: "blocked.example"})
+
+	items := []domain.SourceItem{{URL: "https://blocked.example/feed.xml"}, {URL: "https://open.example/feed.xml"}}
+	got, err := svc.DiscoverForChannel(context.Background(), 1, items)
+	if err != nil {
+		t.Fatalf("DiscoverForChannel() error = %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("candidates = %d, want 1", len(got))
+	}
+	if got[0].Endpoint != "https://open.example/feed.xml" {
+		t.Fatalf("endpoint = %q", got[0].Endpoint)
+	}
+}
+
+func TestDiscoverForChannelSkipsWhenAnalyticsScoreIsNegative(t *testing.T) {
+	svc, err := New(&sourceRepoStub{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	svc.WithAnalytics(&analyticsStub{summaries: []ChannelMetrics{{ChannelID: 9, FeedbackDrafts: 2, AvgScore: -0.1}}})
+
+	got, err := svc.DiscoverForChannel(context.Background(), 9, []domain.SourceItem{{URL: "https://open.example/feed.xml"}})
+	if err != nil {
+		t.Fatalf("DiscoverForChannel() error = %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("candidates = %d, want 0", len(got))
+	}
+}
+
+func TestDiscoverForChannelValidationAndErrors(t *testing.T) {
+	svc, err := New(&sourceRepoStub{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if _, err := svc.DiscoverForChannel(context.Background(), 0, nil); err == nil {
+		t.Fatalf("expected channel id validation error")
+	}
+
+	svc.WithAnalytics(&analyticsStub{err: errors.New("boom")})
+	if _, err := svc.DiscoverForChannel(context.Background(), 1, nil); err == nil {
+		t.Fatalf("expected analytics error")
+	}
+
+	svc = svc.WithAnalytics(nil).WithRules(&rulesStub{err: errors.New("boom")})
+	if _, err := svc.DiscoverForChannel(context.Background(), 1, []domain.SourceItem{{URL: "https://open.example/feed.xml"}}); err == nil {
+		t.Fatalf("expected rules error")
 	}
 }

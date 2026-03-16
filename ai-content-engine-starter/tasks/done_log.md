@@ -56,3 +56,4 @@
 - V2-013 completed: added deterministic image enrichment service (direct URL/markdown/html/body URL heuristics), optional pipeline integration hook, SourceItem image URL field, and focused tests.
 - V2-014 completed: extended Telegram publisher to post image drafts via sendPhoto when image URL is present, propagated image URL into created drafts in pipeline, and added focused tests.
 - V2-015 completed: added deterministic automatic source discovery service that derives RSS candidates from collected item URLs, excludes existing hosts/endpoints, and returns sorted capped candidates with focused tests.
+- V2-016 completed: integrated source discovery with optional analytics gating (skip discovery for channels with negative feedback average) and channel rule filtering, with focused tests.

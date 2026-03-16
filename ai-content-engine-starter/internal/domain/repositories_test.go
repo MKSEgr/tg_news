@@ -17,6 +17,7 @@ type stubSourceRepo struct{}
 
 func (stubSourceRepo) Create(context.Context, Source) (Source, error) { return Source{}, nil }
 func (stubSourceRepo) GetByID(context.Context, int64) (Source, error) { return Source{}, nil }
+func (stubSourceRepo) List(context.Context) ([]Source, error)         { return nil, nil }
 func (stubSourceRepo) ListEnabled(context.Context) ([]Source, error)  { return nil, nil }
 
 type stubSourceItemRepo struct{}

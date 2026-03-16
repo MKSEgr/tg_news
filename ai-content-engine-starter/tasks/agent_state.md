@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: V2
-CURRENT_TASK: V2-016
-CURRENT_TASK_TITLE: Integrate discovery with analytics/rules
+CURRENT_TASK: V2-017
+CURRENT_TASK_TITLE: Final V2 architecture review
 STATUS: pending
 
-LAST_COMPLETED_TASK: V2-015
+LAST_COMPLETED_TASK: V2-016
 LAST_COMPLETED_AT: 2026-03-16
 
-NEXT_TASK_HINT: V2-017 Final V2 architecture review
+NEXT_TASK_HINT: V2-018 Create rollout plan and feature flags validation
 
 RULES:
 - execute only CURRENT_TASK

@@ -12,11 +12,29 @@ import (
 )
 
 const defaultMaxCandidates = 5
+const minDiscoveryScore = 0.0
 
 // Service derives deterministic source candidates from collected item URLs.
 type Service struct {
 	sources       domain.SourceRepository
 	maxCandidates int
+	analytics     analyticsSummaryBuilder
+	rules         channelRuleEvaluator
+}
+
+// ChannelMetrics contains minimal analytics fields required by discovery integration.
+type ChannelMetrics struct {
+	ChannelID      int64
+	FeedbackDrafts int
+	AvgScore       float64
+}
+
+type analyticsSummaryBuilder interface {
+	BuildByChannelMetrics(ctx context.Context) ([]ChannelMetrics, error)
+}
+
+type channelRuleEvaluator interface {
+	EvaluateAllowed(ctx context.Context, channelID int64, text string) (bool, error)
 }
 
 // New creates source discovery service.
@@ -25,6 +43,24 @@ func New(sources domain.SourceRepository) (*Service, error) {
 		return nil, fmt.Errorf("source repository is nil")
 	}
 	return &Service{sources: sources, maxCandidates: defaultMaxCandidates}, nil
+}
+
+// WithAnalytics attaches optional analytics dependency for channel-aware discovery gating.
+func (s *Service) WithAnalytics(builder analyticsSummaryBuilder) *Service {
+	if s == nil {
+		return nil
+	}
+	s.analytics = builder
+	return s
+}
+
+// WithRules attaches optional rules dependency for filtering discovered candidates.
+func (s *Service) WithRules(rules channelRuleEvaluator) *Service {
+	if s == nil {
+		return nil
+	}
+	s.rules = rules
+	return s
 }
 
 // Discover returns at most maxCandidates newly discovered source candidates.
@@ -37,9 +73,9 @@ func (s *Service) Discover(ctx context.Context, items []domain.SourceItem) ([]do
 		return nil, fmt.Errorf("context is nil")
 	}
 
-	existing, err := s.sources.ListEnabled(ctx)
+	existing, err := s.sources.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list enabled sources: %w", err)
+		return nil, fmt.Errorf("list sources: %w", err)
 	}
 	existingEndpoints := make(map[string]struct{}, len(existing))
 	existingHosts := make(map[string]struct{}, len(existing))
@@ -99,6 +135,55 @@ func (s *Service) Discover(ctx context.Context, items []domain.SourceItem) ([]do
 		out = append(out, candidatesByEndpoint[endpoints[i]])
 	}
 	return out, nil
+}
+
+// DiscoverForChannel runs discovery and applies optional analytics/rules for one channel.
+func (s *Service) DiscoverForChannel(ctx context.Context, channelID int64, items []domain.SourceItem) ([]domain.Source, error) {
+	if s == nil {
+		return nil, fmt.Errorf("source discovery service is nil")
+	}
+	if ctx == nil {
+		return nil, fmt.Errorf("context is nil")
+	}
+	if channelID <= 0 {
+		return nil, fmt.Errorf("channel id is invalid")
+	}
+
+	if s.analytics != nil {
+		summaries, err := s.analytics.BuildByChannelMetrics(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("build analytics summaries: %w", err)
+		}
+		for _, summary := range summaries {
+			if summary.ChannelID != channelID {
+				continue
+			}
+			if summary.FeedbackDrafts > 0 && summary.AvgScore < minDiscoveryScore {
+				return []domain.Source{}, nil
+			}
+			break
+		}
+	}
+
+	candidates, err := s.Discover(ctx, items)
+	if err != nil {
+		return nil, err
+	}
+	if s.rules == nil {
+		return candidates, nil
+	}
+
+	filtered := make([]domain.Source, 0, len(candidates))
+	for _, candidate := range candidates {
+		allowed, err := s.rules.EvaluateAllowed(ctx, channelID, strings.TrimSpace(candidate.Name+" "+candidate.Endpoint))
+		if err != nil {
+			return nil, fmt.Errorf("evaluate rules for discovered source %s: %w", candidate.Endpoint, err)
+		}
+		if allowed {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return filtered, nil
 }
 
 func candidateEndpoint(raw string) (endpoint string, host string, ok bool) {

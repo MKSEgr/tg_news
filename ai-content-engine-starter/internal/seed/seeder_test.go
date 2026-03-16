@@ -38,6 +38,9 @@ func (f *fakeSourceRepo) Create(_ context.Context, s domain.Source) (domain.Sour
 func (f *fakeSourceRepo) GetByID(context.Context, int64) (domain.Source, error) {
 	return domain.Source{}, domain.ErrNotFound
 }
+func (f *fakeSourceRepo) List(context.Context) ([]domain.Source, error) {
+	return f.listResult, f.listErr
+}
 func (f *fakeSourceRepo) ListEnabled(context.Context) ([]domain.Source, error) {
 	return f.listResult, f.listErr
 }

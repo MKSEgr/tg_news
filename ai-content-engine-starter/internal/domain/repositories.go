@@ -19,6 +19,7 @@ type ChannelRepository interface {
 type SourceRepository interface {
 	Create(ctx context.Context, source Source) (Source, error)
 	GetByID(ctx context.Context, id int64) (Source, error)
+	List(ctx context.Context) ([]Source, error)
 	ListEnabled(ctx context.Context) ([]Source, error)
 }
 

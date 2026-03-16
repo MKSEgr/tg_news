@@ -25,6 +25,12 @@ func (s *sourceRepoStub) Create(context.Context, domain.Source) (domain.Source, 
 func (s *sourceRepoStub) GetByID(context.Context, int64) (domain.Source, error) {
 	return domain.Source{}, nil
 }
+func (s *sourceRepoStub) List(context.Context) ([]domain.Source, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.sources, nil
+}
 func (s *sourceRepoStub) ListEnabled(context.Context) ([]domain.Source, error) {
 	if s.err != nil {
 		return nil, s.err

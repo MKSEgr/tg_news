@@ -153,6 +153,32 @@ func (r *SourceRepository) GetByID(ctx context.Context, id int64) (domain.Source
 	return source, nil
 }
 
+func (r *SourceRepository) List(ctx context.Context) ([]domain.Source, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+
+	const q = `SELECT id, kind, name, endpoint, enabled, created_at FROM sources ORDER BY id`
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("list sources: %w", err)
+	}
+	defer rows.Close()
+
+	sources := make([]domain.Source, 0)
+	for rows.Next() {
+		var source domain.Source
+		if err := rows.Scan(&source.ID, &source.Kind, &source.Name, &source.Endpoint, &source.Enabled, &source.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan source: %w", err)
+		}
+		sources = append(sources, source)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate sources: %w", err)
+	}
+	return sources, nil
+}
+
 func (r *SourceRepository) ListEnabled(ctx context.Context) ([]domain.Source, error) {
 	if err := ensureDB(r.db); err != nil {
 		return nil, err
