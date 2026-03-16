@@ -1,14 +1,14 @@
 # Agent State
 
 CURRENT_PHASE: V2
-CURRENT_TASK: V2-013
-CURRENT_TASK_TITLE: Implement image enrichment
+CURRENT_TASK: V2-014
+CURRENT_TASK_TITLE: Extend publisher for image posts
 STATUS: pending
 
-LAST_COMPLETED_TASK: V2-012
+LAST_COMPLETED_TASK: V2-013
 LAST_COMPLETED_AT: 2026-03-16
 
-NEXT_TASK_HINT: V2-014 Extend publisher for image posts
+NEXT_TASK_HINT: V2-015 Implement automatic source discovery
 
 RULES:
 - execute only CURRENT_TASK

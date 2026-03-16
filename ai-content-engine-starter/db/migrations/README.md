@@ -17,3 +17,4 @@ Current bootstrap migration:
 
 - `000007_ab_variants` — adds draft variants (`A`/`B`) for deterministic A/B generation and unique source/channel/variant storage.
 - `000008_variant_attribution` — adds explicit A/B variant attribution to performance feedback rows for variant-level analytics.
+- `000009_topic_memory_default_positive` — aligns `topic_memory.mention_count` default with positive-count constraint.

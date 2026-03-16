@@ -28,6 +28,7 @@ type SourceItem struct {
 	URL         string
 	Title       string
 	Body        *string
+	ImageURL    *string
 	PublishedAt *time.Time
 	CollectedAt time.Time
 	CreatedAt   time.Time

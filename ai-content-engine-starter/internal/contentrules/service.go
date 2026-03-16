@@ -54,8 +54,12 @@ func (s *Service) Evaluate(ctx context.Context, channelID int64, text string) (D
 	}
 
 	// deterministic ordering already provided by repository (kind, pattern asc)
+	hasWhitelist := false
 	for i := range rules {
 		r := rules[i]
+		if r.Kind == domain.ContentRuleKindWhitelist {
+			hasWhitelist = true
+		}
 		pattern := strings.ToLower(strings.TrimSpace(r.Pattern))
 		if pattern == "" || !strings.Contains(text, pattern) {
 			continue
@@ -67,6 +71,9 @@ func (s *Service) Evaluate(ctx context.Context, channelID int64, text string) (D
 			copy := r
 			return Decision{Allowed: true, Reason: "matched whitelist rule", Rule: &copy}, nil
 		}
+	}
+	if hasWhitelist {
+		return Decision{Allowed: false, Reason: "no whitelist rule matched"}, nil
 	}
 
 	return Decision{Allowed: true, Reason: "no blocking rule matched"}, nil

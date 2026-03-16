@@ -33,6 +33,7 @@ type PipelineJob struct {
 	channels           domain.ChannelRepository
 	drafts             domain.DraftRepository
 	normalizer         sourceItemNormalizer
+	imageEnricher      sourceItemImageEnricher
 	dedup              duplicateChecker
 	scorer             trendScorer
 	router             channelRouter
@@ -61,6 +62,10 @@ type collectorRunner interface {
 
 type sourceItemNormalizer interface {
 	Normalize(item domain.SourceItem) (domain.SourceItem, error)
+}
+
+type sourceItemImageEnricher interface {
+	Enrich(item domain.SourceItem) (domain.SourceItem, error)
 }
 
 type duplicateChecker interface {
@@ -310,6 +315,15 @@ func NewPipelineJob(
 	}, nil
 }
 
+// WithImageEnricher sets optional image enrichment for normalized items.
+func (j *PipelineJob) WithImageEnricher(enricher sourceItemImageEnricher) *PipelineJob {
+	if j == nil {
+		return nil
+	}
+	j.imageEnricher = enricher
+	return j
+}
+
 // Run executes one orchestration cycle.
 func (j *PipelineJob) Run(ctx context.Context) error {
 	if j == nil {
@@ -361,6 +375,12 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 			normalized, err := j.normalizer.Normalize(item)
 			if err != nil {
 				continue
+			}
+			if j.imageEnricher != nil {
+				normalized, err = j.imageEnricher.Enrich(normalized)
+				if err != nil {
+					return fmt.Errorf("enrich images for item %d: %w", item.ID, err)
+				}
 			}
 
 			duplicate, err := j.dedup.IsDuplicate(ctx, normalized)

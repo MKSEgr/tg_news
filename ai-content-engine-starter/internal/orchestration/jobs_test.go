@@ -108,6 +108,18 @@ type normalizerStub struct{ item domain.SourceItem }
 
 func (n *normalizerStub) Normalize(domain.SourceItem) (domain.SourceItem, error) { return n.item, nil }
 
+type imageEnricherStub struct {
+	item domain.SourceItem
+	err  error
+}
+
+func (e *imageEnricherStub) Enrich(domain.SourceItem) (domain.SourceItem, error) {
+	if e.err != nil {
+		return domain.SourceItem{}, e.err
+	}
+	return e.item, nil
+}
+
 type dedupStub struct{ duplicate bool }
 
 func (d *dedupStub) IsDuplicate(context.Context, domain.SourceItem) (bool, error) {
@@ -280,6 +292,73 @@ func TestPipelineJobRunCreatesDraft(t *testing.T) {
 	}
 	if drafts.created[0].Status != domain.DraftStatusPending {
 		t.Fatalf("status = %s, want pending", drafts.created[0].Status)
+	}
+}
+
+func TestPipelineJobRunAppliesImageEnrichment(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	imageURL := "https://cdn.example.com/image.jpg"
+	enriched := item
+	enriched.ImageURL = &imageURL
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job.WithImageEnricher(&imageEnricherStub{item: enriched})
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.created) != 1 {
+		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunReturnsErrorWhenImageEnrichmentFails(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		&draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}},
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job.WithImageEnricher(&imageEnricherStub{err: errors.New("boom")})
+
+	if err := job.Run(context.Background()); err == nil {
+		t.Fatalf("expected error")
 	}
 }
 

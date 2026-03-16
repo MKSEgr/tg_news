@@ -12,7 +12,7 @@
 - [x] V2-010 Implement per-channel analytics
 - [x] V2-011 Implement Telegram admin bot
 - [x] V2-012 Implement basic web UI
-- [ ] V2-013 Implement image enrichment
+- [x] V2-013 Implement image enrichment
 - [ ] V2-014 Extend publisher for image posts
 - [ ] V2-015 Implement automatic source discovery
 - [ ] V2-016 Integrate discovery with analytics/rules

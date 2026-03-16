@@ -96,3 +96,18 @@ func TestEvaluateAllowsOnWhitelistMatch(t *testing.T) {
 		t.Fatalf("reason = %q, want matched whitelist rule", d.Reason)
 	}
 }
+
+func TestEvaluateBlocksWhenWhitelistExistsAndNoMatch(t *testing.T) {
+	repo := &repoStub{rules: []domain.ContentRule{{Kind: domain.ContentRuleKindWhitelist, Pattern: "trusted"}}}
+	svc, _ := New(repo)
+	d, err := svc.Evaluate(context.Background(), 1, "general source update")
+	if err != nil {
+		t.Fatalf("Evaluate() error = %v", err)
+	}
+	if d.Allowed {
+		t.Fatalf("expected blocked decision")
+	}
+	if d.Reason != "no whitelist rule matched" {
+		t.Fatalf("reason = %q, want no whitelist rule matched", d.Reason)
+	}
+}
