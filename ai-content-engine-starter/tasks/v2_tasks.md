@@ -7,7 +7,7 @@
 - [x] V2-005 Integrate rules into pipeline
 - [x] V2-006 Integrate feedback into scoring/generation/routing
 - [x] V2-007 Implement A/B variants
-- [ ] V2-008 Implement variant attribution
+- [x] V2-008 Implement variant attribution
 - [ ] V2-009 Implement auto repost
 - [ ] V2-010 Implement per-channel analytics
 - [ ] V2-011 Implement Telegram admin bot

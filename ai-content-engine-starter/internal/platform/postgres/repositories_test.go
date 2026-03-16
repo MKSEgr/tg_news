@@ -87,6 +87,9 @@ func TestPerformanceFeedbackRepositoryRejectsInvalidInput(t *testing.T) {
 	if _, err := repo.Upsert(context.Background(), domain.PerformanceFeedback{}); err == nil {
 		t.Fatalf("Upsert expected validation error")
 	}
+	if _, err := repo.Upsert(context.Background(), domain.PerformanceFeedback{DraftID: 1, ChannelID: 1, Variant: "C"}); err == nil {
+		t.Fatalf("Upsert expected variant validation error")
+	}
 	if _, err := repo.GetByDraftID(context.Background(), 0); err == nil {
 		t.Fatalf("GetByDraftID expected validation error")
 	}

@@ -16,3 +16,4 @@ Current bootstrap migration:
 
 
 - `000007_ab_variants` — adds draft variants (`A`/`B`) for deterministic A/B generation and unique source/channel/variant storage.
+- `000008_variant_attribution` — adds explicit A/B variant attribution to performance feedback rows for variant-level analytics.

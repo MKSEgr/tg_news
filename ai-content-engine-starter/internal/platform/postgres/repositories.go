@@ -475,19 +475,24 @@ func (r *PerformanceFeedbackRepository) Upsert(ctx context.Context, feedback dom
 	if feedback.Score < 0 || math.IsNaN(feedback.Score) || math.IsInf(feedback.Score, 0) {
 		return domain.PerformanceFeedback{}, fmt.Errorf("feedback score is invalid")
 	}
+	feedback.Variant = normalizeABVariant(feedback.Variant)
+	if feedback.Variant != "A" && feedback.Variant != "B" {
+		return domain.PerformanceFeedback{}, fmt.Errorf("feedback variant is invalid")
+	}
 
-	const q = `INSERT INTO performance_feedback (draft_id, channel_id, views_count, clicks_count, reactions_count, shares_count, score)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	const q = `INSERT INTO performance_feedback (draft_id, channel_id, variant, views_count, clicks_count, reactions_count, shares_count, score)
+		VALUES ($1, $2, COALESCE(NULLIF($3, ''), (SELECT variant FROM drafts WHERE id = $1), 'A'), $4, $5, $6, $7, $8)
 		ON CONFLICT (draft_id) DO UPDATE
-		SET views_count = EXCLUDED.views_count,
+		SET variant = EXCLUDED.variant,
+			views_count = EXCLUDED.views_count,
 			clicks_count = EXCLUDED.clicks_count,
 			reactions_count = EXCLUDED.reactions_count,
 			shares_count = EXCLUDED.shares_count,
 			score = EXCLUDED.score,
 			updated_at = NOW()
-		RETURNING id, draft_id, channel_id, views_count, clicks_count, reactions_count, shares_count, score, created_at, updated_at`
-	row := r.db.QueryRowContext(ctx, q, feedback.DraftID, feedback.ChannelID, feedback.ViewsCount, feedback.ClicksCount, feedback.ReactionsCount, feedback.SharesCount, feedback.Score)
-	if err := row.Scan(&feedback.ID, &feedback.DraftID, &feedback.ChannelID, &feedback.ViewsCount, &feedback.ClicksCount, &feedback.ReactionsCount, &feedback.SharesCount, &feedback.Score, &feedback.CreatedAt, &feedback.UpdatedAt); err != nil {
+		RETURNING id, draft_id, channel_id, variant, views_count, clicks_count, reactions_count, shares_count, score, created_at, updated_at`
+	row := r.db.QueryRowContext(ctx, q, feedback.DraftID, feedback.ChannelID, feedback.Variant, feedback.ViewsCount, feedback.ClicksCount, feedback.ReactionsCount, feedback.SharesCount, feedback.Score)
+	if err := row.Scan(&feedback.ID, &feedback.DraftID, &feedback.ChannelID, &feedback.Variant, &feedback.ViewsCount, &feedback.ClicksCount, &feedback.ReactionsCount, &feedback.SharesCount, &feedback.Score, &feedback.CreatedAt, &feedback.UpdatedAt); err != nil {
 		return domain.PerformanceFeedback{}, fmt.Errorf("upsert performance feedback: %w", err)
 	}
 	return feedback, nil
@@ -501,17 +506,25 @@ func (r *PerformanceFeedbackRepository) GetByDraftID(ctx context.Context, draftI
 		return domain.PerformanceFeedback{}, fmt.Errorf("draft id must be greater than zero")
 	}
 
-	const q = `SELECT id, draft_id, channel_id, views_count, clicks_count, reactions_count, shares_count, score, created_at, updated_at
+	const q = `SELECT id, draft_id, channel_id, variant, views_count, clicks_count, reactions_count, shares_count, score, created_at, updated_at
 		FROM performance_feedback WHERE draft_id = $1`
 	var feedback domain.PerformanceFeedback
 	row := r.db.QueryRowContext(ctx, q, draftID)
-	if err := row.Scan(&feedback.ID, &feedback.DraftID, &feedback.ChannelID, &feedback.ViewsCount, &feedback.ClicksCount, &feedback.ReactionsCount, &feedback.SharesCount, &feedback.Score, &feedback.CreatedAt, &feedback.UpdatedAt); err != nil {
+	if err := row.Scan(&feedback.ID, &feedback.DraftID, &feedback.ChannelID, &feedback.Variant, &feedback.ViewsCount, &feedback.ClicksCount, &feedback.ReactionsCount, &feedback.SharesCount, &feedback.Score, &feedback.CreatedAt, &feedback.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.PerformanceFeedback{}, domain.ErrNotFound
 		}
 		return domain.PerformanceFeedback{}, fmt.Errorf("get performance feedback by draft id: %w", err)
 	}
 	return feedback, nil
+}
+
+func normalizeABVariant(raw string) string {
+	value := strings.ToUpper(strings.TrimSpace(raw))
+	if value == "" {
+		return "A"
+	}
+	return value
 }
 
 type sourceItemScanner interface {

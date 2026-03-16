@@ -91,6 +91,7 @@ type PerformanceFeedback struct {
 	ID             int64
 	DraftID        int64
 	ChannelID      int64
+	Variant        string
 	ViewsCount     int64
 	ClicksCount    int64
 	ReactionsCount int64
