@@ -62,3 +62,4 @@
 - V2-018 completed: added centralized V2 feature flags with validation in config, added rollout plan documentation, and updated app runtime admin composition to use an in-process draft repository instead of an always-unavailable fallback.
 - V2-018 refinement: expanded rollout documentation with phase-based validation/rollback plan, full feature-flag matrix, and rollout-focused cleanup plan tied to architecture review findings.
 - V3-001 completed: added minimal editorial planner module, publish_intents domain/repository/migration, and optional orchestration hook to create one deterministic publish intent per item using scorer+router.
+- V3-002 completed: formalized publish intent statuses/semantics, added publish_intents status+uniqueness constraints, strengthened planner idempotency for raw item + channel, and added repository/status validation tests.

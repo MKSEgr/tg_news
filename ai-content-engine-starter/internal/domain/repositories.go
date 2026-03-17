@@ -42,6 +42,7 @@ type DraftRepository interface {
 type PublishIntentRepository interface {
 	Create(ctx context.Context, intent PublishIntent) (PublishIntent, error)
 	ListByRawItemID(ctx context.Context, rawItemID int64, limit int) ([]PublishIntent, error)
+	UpdateStatus(ctx context.Context, id int64, status PublishIntentStatus) error
 }
 
 // TopicMemoryRepository defines persistence operations for topic memory.

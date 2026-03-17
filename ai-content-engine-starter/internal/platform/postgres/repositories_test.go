@@ -25,11 +25,20 @@ func TestPublishIntentRepositoryRejectsInvalidInput(t *testing.T) {
 	if _, err := repo.Create(context.Background(), domain.PublishIntent{}); err == nil {
 		t.Fatalf("Create expected validation error")
 	}
+	if _, err := repo.Create(context.Background(), domain.PublishIntent{RawItemID: 1, ChannelID: 1, Format: "text", Priority: 1, Status: "invalid"}); err == nil {
+		t.Fatalf("Create expected status validation error")
+	}
 	if _, err := repo.ListByRawItemID(context.Background(), 0, 10); err == nil {
 		t.Fatalf("ListByRawItemID expected validation error for raw item id")
 	}
 	if _, err := repo.ListByRawItemID(context.Background(), 1, 0); err == nil {
 		t.Fatalf("ListByRawItemID expected validation error for limit")
+	}
+	if err := repo.UpdateStatus(context.Background(), 0, domain.PublishIntentStatusPlanned); err == nil {
+		t.Fatalf("UpdateStatus expected id validation error")
+	}
+	if err := repo.UpdateStatus(context.Background(), 1, "invalid"); err == nil {
+		t.Fatalf("UpdateStatus expected status validation error")
 	}
 }
 

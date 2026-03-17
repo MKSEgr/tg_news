@@ -36,6 +36,10 @@ func (r *testPublishIntentRepo) ListByRawItemID(_ context.Context, rawItemID int
 	return r.listByRawID[rawItemID], nil
 }
 
+func (r *testPublishIntentRepo) UpdateStatus(context.Context, int64, domain.PublishIntentStatus) error {
+	return nil
+}
+
 type testChannelsRepo struct {
 	channels []domain.Channel
 	err      error
@@ -92,6 +96,9 @@ func TestPlanForItemCreatesSingleIntent(t *testing.T) {
 	if intents[0].Status != domain.PublishIntentStatusPlanned {
 		t.Fatalf("Status = %q, want %q", intents[0].Status, domain.PublishIntentStatusPlanned)
 	}
+	if intents[0].Format != "text" {
+		t.Fatalf("Format = %q, want text", intents[0].Format)
+	}
 }
 
 func TestPlanForItemReturnsEmptyForNonPositiveScore(t *testing.T) {
@@ -121,7 +128,7 @@ func TestPlanForItemPropagatesRepoError(t *testing.T) {
 }
 
 func TestPlanForItemSkipsWhenIntentAlreadyExists(t *testing.T) {
-	repo := &testPublishIntentRepo{listByRawID: map[int64][]domain.PublishIntent{1: {{ID: 10, RawItemID: 1}}}}
+	repo := &testPublishIntentRepo{listByRawID: map[int64][]domain.PublishIntent{1: {{ID: 10, RawItemID: 1, ChannelID: 1}}}}
 	svc, err := New(repo, testChannelsRepo{channels: []domain.Channel{{ID: 1}}}, testScorer{score: 4}, testRouter{ids: []int64{1}})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -132,6 +139,24 @@ func TestPlanForItemSkipsWhenIntentAlreadyExists(t *testing.T) {
 	}
 	if len(intents) != 0 {
 		t.Fatalf("len(intents) = %d, want 0", len(intents))
+	}
+}
+
+func TestPlanForItemAllowsDifferentChannelForSameRawItem(t *testing.T) {
+	repo := &testPublishIntentRepo{listByRawID: map[int64][]domain.PublishIntent{1: {{ID: 10, RawItemID: 1, ChannelID: 1}}}}
+	svc, err := New(repo, testChannelsRepo{channels: []domain.Channel{{ID: 1}, {ID: 2}}}, testScorer{score: 4}, testRouter{ids: []int64{2}})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	intents, err := svc.PlanForItem(context.Background(), RawItem{ID: 1})
+	if err != nil {
+		t.Fatalf("PlanForItem() error = %v", err)
+	}
+	if len(intents) != 1 {
+		t.Fatalf("len(intents) = %d, want 1", len(intents))
+	}
+	if intents[0].ChannelID != 2 {
+		t.Fatalf("ChannelID = %d, want 2", intents[0].ChannelID)
 	}
 }
 

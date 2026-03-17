@@ -58,16 +58,25 @@ type Draft struct {
 	UpdatedAt    time.Time
 }
 
-// PublishIntentStatus defines planning workflow state for V3 editorial planner.
+// PublishIntentStatus defines a minimal, explainable lifecycle for planner output.
+//
+// Semantics:
+//   - planned: set by editorial planner when item should proceed to downstream pipeline.
+//   - skipped: set by editorial planner (or future pipeline checks) when item should not proceed.
+//   - cancelled: reserved for future pipeline/operator cancellation before execution.
+//
+// V3 intentionally keeps this as a lightweight status model (no state machine yet).
 type PublishIntentStatus string
 
 const (
-	PublishIntentStatusPlanned  PublishIntentStatus = "planned"
-	PublishIntentStatusRejected PublishIntentStatus = "rejected"
-	PublishIntentStatusUsed     PublishIntentStatus = "used"
+	PublishIntentStatusPlanned   PublishIntentStatus = "planned"
+	PublishIntentStatusSkipped   PublishIntentStatus = "skipped"
+	PublishIntentStatusCancelled PublishIntentStatus = "cancelled"
 )
 
-// PublishIntent stores a planner-produced intent to publish a raw item to a channel.
+// PublishIntent is a separate control-layer entity produced by editorial planning.
+// It decouples planner decisions from immediate draft generation and will be consumed
+// by future V3 pipeline integration (V3-003) without changing V2 flow contracts.
 type PublishIntent struct {
 	ID        int64
 	RawItemID int64

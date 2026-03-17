@@ -390,15 +390,47 @@ func (r *PublishIntentRepository) Create(ctx context.Context, intent domain.Publ
 	if intent.Status == "" {
 		intent.Status = domain.PublishIntentStatusPlanned
 	}
+	if intent.Status != domain.PublishIntentStatusPlanned && intent.Status != domain.PublishIntentStatusSkipped && intent.Status != domain.PublishIntentStatusCancelled {
+		return domain.PublishIntent{}, fmt.Errorf("intent status is invalid")
+	}
 
 	const q = `INSERT INTO publish_intents (raw_item_id, channel_id, format, priority, status)
 		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (raw_item_id, channel_id) DO UPDATE
+		SET format = publish_intents.format
 		RETURNING id, raw_item_id, channel_id, format, priority, status, created_at`
 	row := r.db.QueryRowContext(ctx, q, intent.RawItemID, intent.ChannelID, intent.Format, intent.Priority, intent.Status)
 	if err := row.Scan(&intent.ID, &intent.RawItemID, &intent.ChannelID, &intent.Format, &intent.Priority, &intent.Status, &intent.CreatedAt); err != nil {
 		return domain.PublishIntent{}, fmt.Errorf("create publish intent: %w", err)
 	}
 	return intent, nil
+}
+
+func (r *PublishIntentRepository) UpdateStatus(ctx context.Context, id int64, status domain.PublishIntentStatus) error {
+	if err := ensureDB(r.db); err != nil {
+		return err
+	}
+	if id <= 0 {
+		return fmt.Errorf("publish intent id must be greater than zero")
+	}
+	status = domain.PublishIntentStatus(strings.TrimSpace(string(status)))
+	if status != domain.PublishIntentStatusPlanned && status != domain.PublishIntentStatusSkipped && status != domain.PublishIntentStatusCancelled {
+		return fmt.Errorf("publish intent status is invalid")
+	}
+
+	const q = `UPDATE publish_intents SET status = $1 WHERE id = $2`
+	res, err := r.db.ExecContext(ctx, q, status, id)
+	if err != nil {
+		return fmt.Errorf("update publish intent status: %w", err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("publish intent status rows affected: %w", err)
+	}
+	if affected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
 }
 
 func (r *PublishIntentRepository) ListByRawItemID(ctx context.Context, rawItemID int64, limit int) ([]domain.PublishIntent, error) {
@@ -583,9 +615,12 @@ func (r *PerformanceFeedbackRepository) Upsert(ctx context.Context, feedback dom
 	}
 
 	const q = `INSERT INTO performance_feedback (draft_id, channel_id, variant, views_count, clicks_count, reactions_count, shares_count, score)
-		VALUES ($1, $2, COALESCE(NULLIF($3, ''), (SELECT variant FROM drafts WHERE id = $1), 'A'), $4, $5, $6, $7, $8)
+		SELECT d.id, d.channel_id, COALESCE(NULLIF($3, ''), d.variant, 'A'), $4, $5, $6, $7, $8
+		FROM drafts d
+		WHERE d.id = $1 AND d.channel_id = $2
 		ON CONFLICT (draft_id) DO UPDATE
-		SET variant = EXCLUDED.variant,
+		SET channel_id = EXCLUDED.channel_id,
+			variant = EXCLUDED.variant,
 			views_count = EXCLUDED.views_count,
 			clicks_count = EXCLUDED.clicks_count,
 			reactions_count = EXCLUDED.reactions_count,
@@ -595,6 +630,9 @@ func (r *PerformanceFeedbackRepository) Upsert(ctx context.Context, feedback dom
 		RETURNING id, draft_id, channel_id, variant, views_count, clicks_count, reactions_count, shares_count, score, created_at, updated_at`
 	row := r.db.QueryRowContext(ctx, q, feedback.DraftID, feedback.ChannelID, feedback.Variant, feedback.ViewsCount, feedback.ClicksCount, feedback.ReactionsCount, feedback.SharesCount, feedback.Score)
 	if err := row.Scan(&feedback.ID, &feedback.DraftID, &feedback.ChannelID, &feedback.Variant, &feedback.ViewsCount, &feedback.ClicksCount, &feedback.ReactionsCount, &feedback.SharesCount, &feedback.Score, &feedback.CreatedAt, &feedback.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.PerformanceFeedback{}, domain.ErrNotFound
+		}
 		return domain.PerformanceFeedback{}, fmt.Errorf("upsert performance feedback: %w", err)
 	}
 	return feedback, nil

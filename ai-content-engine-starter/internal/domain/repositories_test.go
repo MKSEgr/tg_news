@@ -76,6 +76,9 @@ func (stubPublishIntentRepo) Create(context.Context, PublishIntent) (PublishInte
 func (stubPublishIntentRepo) ListByRawItemID(context.Context, int64, int) ([]PublishIntent, error) {
 	return nil, nil
 }
+func (stubPublishIntentRepo) UpdateStatus(context.Context, int64, PublishIntentStatus) error {
+	return nil
+}
 
 func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ ChannelRepository = stubChannelRepo{}

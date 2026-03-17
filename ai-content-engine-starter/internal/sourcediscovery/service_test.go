@@ -147,12 +147,12 @@ func TestDiscoverForChannelFiltersWithRules(t *testing.T) {
 	}
 }
 
-func TestDiscoverForChannelSkipsWhenAnalyticsScoreIsNegative(t *testing.T) {
+func TestDiscoverForChannelSkipsWhenAnalyticsScoreIsBelowThreshold(t *testing.T) {
 	svc, err := New(&sourceRepoStub{})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	svc.WithAnalytics(&analyticsStub{summaries: []ChannelMetrics{{ChannelID: 9, FeedbackDrafts: 2, AvgScore: -0.1}}})
+	svc.WithAnalytics(&analyticsStub{summaries: []ChannelMetrics{{ChannelID: 9, FeedbackDrafts: 2, AvgScore: 0.1}}})
 
 	got, err := svc.DiscoverForChannel(context.Background(), 9, []domain.SourceItem{{URL: "https://open.example/feed.xml"}})
 	if err != nil {

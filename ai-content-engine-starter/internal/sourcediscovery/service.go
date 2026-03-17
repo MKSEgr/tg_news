@@ -12,7 +12,7 @@ import (
 )
 
 const defaultMaxCandidates = 5
-const minDiscoveryScore = 0.0
+const minDiscoveryScore = 0.2
 
 // Service derives deterministic source candidates from collected item URLs.
 type Service struct {

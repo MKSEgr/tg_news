@@ -73,14 +73,6 @@ func (s *Service) PlanForItem(ctx context.Context, item RawItem) ([]PublishInten
 		return nil, fmt.Errorf("raw item id is invalid")
 	}
 
-	existing, err := s.repo.ListByRawItemID(ctx, item.ID, 1)
-	if err != nil {
-		return nil, fmt.Errorf("list publish intents by raw item id: %w", err)
-	}
-	if len(existing) > 0 {
-		return []PublishIntent{}, nil
-	}
-
 	normalized := domain.SourceItem{
 		ID:    item.ID,
 		URL:   strings.TrimSpace(item.URL),
@@ -105,6 +97,15 @@ func (s *Service) PlanForItem(ctx context.Context, item RawItem) ([]PublishInten
 	channelID, ok := firstValidChannelID(routes)
 	if !ok {
 		return []PublishIntent{}, nil
+	}
+	existing, err := s.repo.ListByRawItemID(ctx, item.ID, 10)
+	if err != nil {
+		return nil, fmt.Errorf("list publish intents by raw item id: %w", err)
+	}
+	for _, intent := range existing {
+		if intent.ChannelID == channelID {
+			return []PublishIntent{}, nil
+		}
 	}
 
 	intent := domain.PublishIntent{
