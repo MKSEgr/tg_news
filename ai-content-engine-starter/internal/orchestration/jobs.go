@@ -387,9 +387,7 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 
 		for _, item := range items {
 			if j.planner != nil {
-				if _, err := j.planner.PlanForSourceItem(ctx, item); err != nil {
-					return fmt.Errorf("plan publish intents for item %d: %w", item.ID, err)
-				}
+				_, _ = j.planner.PlanForSourceItem(ctx, item)
 			}
 
 			normalized, err := j.normalizer.Normalize(item)
