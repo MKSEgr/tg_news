@@ -68,6 +68,15 @@ func (stubPerformanceFeedbackRepo) GetByDraftID(context.Context, int64) (Perform
 	return PerformanceFeedback{}, nil
 }
 
+type stubPublishIntentRepo struct{}
+
+func (stubPublishIntentRepo) Create(context.Context, PublishIntent) (PublishIntent, error) {
+	return PublishIntent{}, nil
+}
+func (stubPublishIntentRepo) ListByRawItemID(context.Context, int64, int) ([]PublishIntent, error) {
+	return nil, nil
+}
+
 func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ ChannelRepository = stubChannelRepo{}
 	var _ SourceRepository = stubSourceRepo{}
@@ -76,6 +85,7 @@ func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ TopicMemoryRepository = stubTopicMemoryRepo{}
 	var _ ContentRuleRepository = stubContentRuleRepo{}
 	var _ PerformanceFeedbackRepository = stubPerformanceFeedbackRepo{}
+	var _ PublishIntentRepository = stubPublishIntentRepo{}
 }
 
 func TestErrNotFoundIsWrappable(t *testing.T) {

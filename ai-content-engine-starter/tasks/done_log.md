@@ -61,3 +61,4 @@
 - V2-017 completed: performed final architecture review based on implemented V2 modules and architecture maps; documented critical/medium/low issues, central modules/tables, and follow-up risk focus in docs/v2_architecture_review.md.
 - V2-018 completed: added centralized V2 feature flags with validation in config, added rollout plan documentation, and updated app runtime admin composition to use an in-process draft repository instead of an always-unavailable fallback.
 - V2-018 refinement: expanded rollout documentation with phase-based validation/rollback plan, full feature-flag matrix, and rollout-focused cleanup plan tied to architecture review findings.
+- V3-001 completed: added minimal editorial planner module, publish_intents domain/repository/migration, and optional orchestration hook to create one deterministic publish intent per item using scorer+router.

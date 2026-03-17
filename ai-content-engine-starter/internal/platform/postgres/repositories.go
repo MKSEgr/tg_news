@@ -31,6 +31,11 @@ type DraftRepository struct {
 	db *sql.DB
 }
 
+// PublishIntentRepository is a PostgreSQL implementation of domain.PublishIntentRepository.
+type PublishIntentRepository struct {
+	db *sql.DB
+}
+
 // TopicMemoryRepository is a PostgreSQL implementation of domain.TopicMemoryRepository.
 type TopicMemoryRepository struct {
 	db *sql.DB
@@ -50,6 +55,9 @@ func NewChannelRepository(db *sql.DB) *ChannelRepository       { return &Channel
 func NewSourceRepository(db *sql.DB) *SourceRepository         { return &SourceRepository{db: db} }
 func NewSourceItemRepository(db *sql.DB) *SourceItemRepository { return &SourceItemRepository{db: db} }
 func NewDraftRepository(db *sql.DB) *DraftRepository           { return &DraftRepository{db: db} }
+func NewPublishIntentRepository(db *sql.DB) *PublishIntentRepository {
+	return &PublishIntentRepository{db: db}
+}
 func NewTopicMemoryRepository(db *sql.DB) *TopicMemoryRepository {
 	return &TopicMemoryRepository{db: db}
 }
@@ -359,6 +367,74 @@ func (r *DraftRepository) UpdateStatus(ctx context.Context, id int64, status dom
 		return domain.ErrNotFound
 	}
 	return nil
+}
+
+func (r *PublishIntentRepository) Create(ctx context.Context, intent domain.PublishIntent) (domain.PublishIntent, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.PublishIntent{}, err
+	}
+	if intent.RawItemID <= 0 {
+		return domain.PublishIntent{}, fmt.Errorf("raw item id must be greater than zero")
+	}
+	if intent.ChannelID <= 0 {
+		return domain.PublishIntent{}, fmt.Errorf("channel id must be greater than zero")
+	}
+	intent.Format = strings.ToLower(strings.TrimSpace(intent.Format))
+	if intent.Format == "" {
+		return domain.PublishIntent{}, fmt.Errorf("intent format is empty")
+	}
+	if intent.Priority <= 0 {
+		return domain.PublishIntent{}, fmt.Errorf("intent priority must be greater than zero")
+	}
+	intent.Status = domain.PublishIntentStatus(strings.TrimSpace(string(intent.Status)))
+	if intent.Status == "" {
+		intent.Status = domain.PublishIntentStatusPlanned
+	}
+
+	const q = `INSERT INTO publish_intents (raw_item_id, channel_id, format, priority, status)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, raw_item_id, channel_id, format, priority, status, created_at`
+	row := r.db.QueryRowContext(ctx, q, intent.RawItemID, intent.ChannelID, intent.Format, intent.Priority, intent.Status)
+	if err := row.Scan(&intent.ID, &intent.RawItemID, &intent.ChannelID, &intent.Format, &intent.Priority, &intent.Status, &intent.CreatedAt); err != nil {
+		return domain.PublishIntent{}, fmt.Errorf("create publish intent: %w", err)
+	}
+	return intent, nil
+}
+
+func (r *PublishIntentRepository) ListByRawItemID(ctx context.Context, rawItemID int64, limit int) ([]domain.PublishIntent, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if rawItemID <= 0 {
+		return nil, fmt.Errorf("raw item id must be greater than zero")
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, raw_item_id, channel_id, format, priority, status, created_at
+		FROM publish_intents
+		WHERE raw_item_id = $1
+		ORDER BY id DESC
+		LIMIT $2`
+	rows, err := r.db.QueryContext(ctx, q, rawItemID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list publish intents by raw item id: %w", err)
+	}
+	defer rows.Close()
+
+	intents := make([]domain.PublishIntent, 0)
+	for rows.Next() {
+		var intent domain.PublishIntent
+		if err := rows.Scan(&intent.ID, &intent.RawItemID, &intent.ChannelID, &intent.Format, &intent.Priority, &intent.Status, &intent.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan publish intent: %w", err)
+		}
+		intents = append(intents, intent)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate publish intents: %w", err)
+	}
+	return intents, nil
 }
 
 func (r *TopicMemoryRepository) UpsertMention(ctx context.Context, memory domain.TopicMemory) (domain.TopicMemory, error) {

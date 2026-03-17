@@ -38,6 +38,12 @@ type DraftRepository interface {
 	UpdateStatus(ctx context.Context, id int64, status DraftStatus) error
 }
 
+// PublishIntentRepository defines persistence operations for editorial planner intents.
+type PublishIntentRepository interface {
+	Create(ctx context.Context, intent PublishIntent) (PublishIntent, error)
+	ListByRawItemID(ctx context.Context, rawItemID int64, limit int) ([]PublishIntent, error)
+}
+
 // TopicMemoryRepository defines persistence operations for topic memory.
 type TopicMemoryRepository interface {
 	UpsertMention(ctx context.Context, memory TopicMemory) (TopicMemory, error)

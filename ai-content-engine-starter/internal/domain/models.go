@@ -58,6 +58,26 @@ type Draft struct {
 	UpdatedAt    time.Time
 }
 
+// PublishIntentStatus defines planning workflow state for V3 editorial planner.
+type PublishIntentStatus string
+
+const (
+	PublishIntentStatusPlanned  PublishIntentStatus = "planned"
+	PublishIntentStatusRejected PublishIntentStatus = "rejected"
+	PublishIntentStatusUsed     PublishIntentStatus = "used"
+)
+
+// PublishIntent stores a planner-produced intent to publish a raw item to a channel.
+type PublishIntent struct {
+	ID        int64
+	RawItemID int64
+	ChannelID int64
+	Format    string
+	Priority  int
+	Status    PublishIntentStatus
+	CreatedAt time.Time
+}
+
 // TopicMemory stores deterministic per-channel topic frequency memory.
 type TopicMemory struct {
 	ID           int64

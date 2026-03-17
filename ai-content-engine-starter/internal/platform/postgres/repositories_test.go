@@ -14,9 +14,23 @@ func TestRepositoriesImplementDomainInterfaces(t *testing.T) {
 	var _ domain.SourceRepository = (*SourceRepository)(nil)
 	var _ domain.SourceItemRepository = (*SourceItemRepository)(nil)
 	var _ domain.DraftRepository = (*DraftRepository)(nil)
+	var _ domain.PublishIntentRepository = (*PublishIntentRepository)(nil)
 	var _ domain.TopicMemoryRepository = (*TopicMemoryRepository)(nil)
 	var _ domain.ContentRuleRepository = (*ContentRuleRepository)(nil)
 	var _ domain.PerformanceFeedbackRepository = (*PerformanceFeedbackRepository)(nil)
+}
+
+func TestPublishIntentRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewPublishIntentRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.PublishIntent{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	if _, err := repo.ListByRawItemID(context.Background(), 0, 10); err == nil {
+		t.Fatalf("ListByRawItemID expected validation error for raw item id")
+	}
+	if _, err := repo.ListByRawItemID(context.Background(), 1, 0); err == nil {
+		t.Fatalf("ListByRawItemID expected validation error for limit")
+	}
 }
 
 func TestListBySourceIDRejectsInvalidLimit(t *testing.T) {

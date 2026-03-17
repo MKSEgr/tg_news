@@ -42,6 +42,7 @@ type PipelineJob struct {
 	topicMemory        topicMemoryReader
 	rules              contentRuleEvaluator
 	feedback           feedbackReader
+	planner            editorialPlanner
 	recentItemsLimit   int
 	existingDraftLimit int
 }
@@ -126,6 +127,10 @@ type memoryAwareRouter interface {
 
 type memoryAwareGuard interface {
 	CheckWithMemory(draft domain.Draft, memories []domain.TopicMemory) (editorial.Result, error)
+}
+
+type editorialPlanner interface {
+	PlanForSourceItem(ctx context.Context, item domain.SourceItem) ([]domain.PublishIntent, error)
 }
 
 // NewCollectorJob creates a collection job.
@@ -324,6 +329,15 @@ func (j *PipelineJob) WithImageEnricher(enricher sourceItemImageEnricher) *Pipel
 	return j
 }
 
+// WithEditorialPlanner sets optional editorial planner integration.
+func (j *PipelineJob) WithEditorialPlanner(planner editorialPlanner) *PipelineJob {
+	if j == nil {
+		return nil
+	}
+	j.planner = planner
+	return j
+}
+
 // Run executes one orchestration cycle.
 func (j *PipelineJob) Run(ctx context.Context) error {
 	if j == nil {
@@ -372,6 +386,12 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 		}
 
 		for _, item := range items {
+			if j.planner != nil {
+				if _, err := j.planner.PlanForSourceItem(ctx, item); err != nil {
+					return fmt.Errorf("plan publish intents for item %d: %w", item.ID, err)
+				}
+			}
+
 			normalized, err := j.normalizer.Normalize(item)
 			if err != nil {
 				continue
