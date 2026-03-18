@@ -46,6 +46,16 @@ type AssetRelationshipRepository struct {
 	db *sql.DB
 }
 
+// StoryClusterRepository is a PostgreSQL implementation of domain.StoryClusterRepository.
+type StoryClusterRepository struct {
+	db *sql.DB
+}
+
+// MonetizationHookRepository is a PostgreSQL implementation of domain.MonetizationHookRepository.
+type MonetizationHookRepository struct {
+	db *sql.DB
+}
+
 // TopicMemoryRepository is a PostgreSQL implementation of domain.TopicMemoryRepository.
 type TopicMemoryRepository struct {
 	db *sql.DB
@@ -73,6 +83,12 @@ func NewContentAssetRepository(db *sql.DB) *ContentAssetRepository {
 }
 func NewAssetRelationshipRepository(db *sql.DB) *AssetRelationshipRepository {
 	return &AssetRelationshipRepository{db: db}
+}
+func NewStoryClusterRepository(db *sql.DB) *StoryClusterRepository {
+	return &StoryClusterRepository{db: db}
+}
+func NewMonetizationHookRepository(db *sql.DB) *MonetizationHookRepository {
+	return &MonetizationHookRepository{db: db}
 }
 func NewTopicMemoryRepository(db *sql.DB) *TopicMemoryRepository {
 	return &TopicMemoryRepository{db: db}
@@ -880,4 +896,160 @@ func (r *AssetRelationshipRepository) ListByAssetID(ctx context.Context, assetID
 		return nil, fmt.Errorf("iterate asset relationships: %w", err)
 	}
 	return rels, nil
+}
+
+func (r *StoryClusterRepository) Create(ctx context.Context, cluster domain.StoryCluster) (domain.StoryCluster, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.StoryCluster{}, err
+	}
+	cluster.ClusterKey = strings.ToLower(strings.TrimSpace(cluster.ClusterKey))
+	if cluster.ClusterKey == "" {
+		return domain.StoryCluster{}, fmt.Errorf("cluster key is empty")
+	}
+	cluster.Title = strings.TrimSpace(cluster.Title)
+	cluster.Summary = strings.TrimSpace(cluster.Summary)
+
+	const q = `INSERT INTO story_clusters (cluster_key, title, summary)
+		VALUES ($1, $2, $3)
+		RETURNING id, cluster_key, title, summary, created_at, updated_at`
+	row := r.db.QueryRowContext(ctx, q, cluster.ClusterKey, cluster.Title, cluster.Summary)
+	if err := row.Scan(&cluster.ID, &cluster.ClusterKey, &cluster.Title, &cluster.Summary, &cluster.CreatedAt, &cluster.UpdatedAt); err != nil {
+		return domain.StoryCluster{}, fmt.Errorf("create story cluster: %w", err)
+	}
+	return cluster, nil
+}
+
+func (r *StoryClusterRepository) GetByID(ctx context.Context, id int64) (domain.StoryCluster, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.StoryCluster{}, err
+	}
+	if id <= 0 {
+		return domain.StoryCluster{}, fmt.Errorf("story cluster id must be greater than zero")
+	}
+
+	const q = `SELECT id, cluster_key, title, summary, created_at, updated_at FROM story_clusters WHERE id = $1`
+	var cluster domain.StoryCluster
+	row := r.db.QueryRowContext(ctx, q, id)
+	if err := row.Scan(&cluster.ID, &cluster.ClusterKey, &cluster.Title, &cluster.Summary, &cluster.CreatedAt, &cluster.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.StoryCluster{}, domain.ErrNotFound
+		}
+		return domain.StoryCluster{}, fmt.Errorf("get story cluster by id: %w", err)
+	}
+	return cluster, nil
+}
+
+func (r *StoryClusterRepository) FindByKey(ctx context.Context, clusterKey string) (domain.StoryCluster, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.StoryCluster{}, err
+	}
+	clusterKey = strings.ToLower(strings.TrimSpace(clusterKey))
+	if clusterKey == "" {
+		return domain.StoryCluster{}, fmt.Errorf("cluster key is empty")
+	}
+
+	const q = `SELECT id, cluster_key, title, summary, created_at, updated_at FROM story_clusters WHERE cluster_key = $1`
+	var cluster domain.StoryCluster
+	row := r.db.QueryRowContext(ctx, q, clusterKey)
+	if err := row.Scan(&cluster.ID, &cluster.ClusterKey, &cluster.Title, &cluster.Summary, &cluster.CreatedAt, &cluster.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.StoryCluster{}, domain.ErrNotFound
+		}
+		return domain.StoryCluster{}, fmt.Errorf("find story cluster by key: %w", err)
+	}
+	return cluster, nil
+}
+
+func (r *MonetizationHookRepository) Create(ctx context.Context, hook domain.MonetizationHook) (domain.MonetizationHook, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.MonetizationHook{}, err
+	}
+	if hook.DraftID <= 0 {
+		return domain.MonetizationHook{}, fmt.Errorf("draft id must be greater than zero")
+	}
+	if hook.ChannelID <= 0 {
+		return domain.MonetizationHook{}, fmt.Errorf("channel id must be greater than zero")
+	}
+	hook.HookType = domain.MonetizationHookType(strings.ToLower(strings.TrimSpace(string(hook.HookType))))
+	if hook.HookType != domain.MonetizationHookTypeAffiliateCTA && hook.HookType != domain.MonetizationHookTypeSponsoredCTA {
+		return domain.MonetizationHook{}, fmt.Errorf("hook type is invalid")
+	}
+	hook.Disclosure = strings.TrimSpace(hook.Disclosure)
+	if hook.Disclosure == "" {
+		return domain.MonetizationHook{}, fmt.Errorf("disclosure is empty")
+	}
+	hook.CTAText = strings.TrimSpace(hook.CTAText)
+	if hook.CTAText == "" {
+		return domain.MonetizationHook{}, fmt.Errorf("cta text is empty")
+	}
+	hook.TargetURL = strings.TrimSpace(hook.TargetURL)
+	if hook.TargetURL == "" {
+		return domain.MonetizationHook{}, fmt.Errorf("target url is empty")
+	}
+
+	const q = `INSERT INTO monetization_hooks (draft_id, channel_id, hook_type, disclosure, cta_text, target_url)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, draft_id, channel_id, hook_type, disclosure, cta_text, target_url, created_at, updated_at`
+	row := r.db.QueryRowContext(ctx, q, hook.DraftID, hook.ChannelID, hook.HookType, hook.Disclosure, hook.CTAText, hook.TargetURL)
+	if err := row.Scan(&hook.ID, &hook.DraftID, &hook.ChannelID, &hook.HookType, &hook.Disclosure, &hook.CTAText, &hook.TargetURL, &hook.CreatedAt, &hook.UpdatedAt); err != nil {
+		return domain.MonetizationHook{}, fmt.Errorf("create monetization hook: %w", err)
+	}
+	return hook, nil
+}
+
+func (r *MonetizationHookRepository) GetByID(ctx context.Context, id int64) (domain.MonetizationHook, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.MonetizationHook{}, err
+	}
+	if id <= 0 {
+		return domain.MonetizationHook{}, fmt.Errorf("monetization hook id must be greater than zero")
+	}
+
+	const q = `SELECT id, draft_id, channel_id, hook_type, disclosure, cta_text, target_url, created_at, updated_at
+		FROM monetization_hooks WHERE id = $1`
+	var hook domain.MonetizationHook
+	row := r.db.QueryRowContext(ctx, q, id)
+	if err := row.Scan(&hook.ID, &hook.DraftID, &hook.ChannelID, &hook.HookType, &hook.Disclosure, &hook.CTAText, &hook.TargetURL, &hook.CreatedAt, &hook.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.MonetizationHook{}, domain.ErrNotFound
+		}
+		return domain.MonetizationHook{}, fmt.Errorf("get monetization hook by id: %w", err)
+	}
+	return hook, nil
+}
+
+func (r *MonetizationHookRepository) ListByDraftID(ctx context.Context, draftID int64, limit int) ([]domain.MonetizationHook, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if draftID <= 0 {
+		return nil, fmt.Errorf("draft id must be greater than zero")
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, draft_id, channel_id, hook_type, disclosure, cta_text, target_url, created_at, updated_at
+		FROM monetization_hooks
+		WHERE draft_id = $1
+		ORDER BY id DESC
+		LIMIT $2`
+	rows, err := r.db.QueryContext(ctx, q, draftID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list monetization hooks by draft id: %w", err)
+	}
+	defer rows.Close()
+
+	hooks := make([]domain.MonetizationHook, 0)
+	for rows.Next() {
+		var hook domain.MonetizationHook
+		if err := rows.Scan(&hook.ID, &hook.DraftID, &hook.ChannelID, &hook.HookType, &hook.Disclosure, &hook.CTAText, &hook.TargetURL, &hook.CreatedAt, &hook.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan monetization hook: %w", err)
+		}
+		hooks = append(hooks, hook)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate monetization hooks: %w", err)
+	}
+	return hooks, nil
 }

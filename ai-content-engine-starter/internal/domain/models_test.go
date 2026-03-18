@@ -54,3 +54,19 @@ func TestAssetRelationshipTypesAreStable(t *testing.T) {
 		t.Fatalf("AssetRelationshipTypeFollowupTo = %q, want %q", AssetRelationshipTypeFollowupTo, "followup_to")
 	}
 }
+
+func TestStoryClusterDefaults(t *testing.T) {
+	cluster := StoryCluster{}
+	if cluster.ClusterKey != "" {
+		t.Fatalf("StoryCluster.ClusterKey = %q, want empty", cluster.ClusterKey)
+	}
+}
+
+func TestMonetizationHookTypesAreStable(t *testing.T) {
+	if MonetizationHookTypeAffiliateCTA != "affiliate_cta" {
+		t.Fatalf("MonetizationHookTypeAffiliateCTA = %q, want %q", MonetizationHookTypeAffiliateCTA, "affiliate_cta")
+	}
+	if MonetizationHookTypeSponsoredCTA != "sponsored_cta" {
+		t.Fatalf("MonetizationHookTypeSponsoredCTA = %q, want %q", MonetizationHookTypeSponsoredCTA, "sponsored_cta")
+	}
+}

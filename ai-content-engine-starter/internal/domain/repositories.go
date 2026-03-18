@@ -58,6 +58,20 @@ type AssetRelationshipRepository interface {
 	ListByAssetID(ctx context.Context, assetID int64, limit int) ([]AssetRelationship, error)
 }
 
+// StoryClusterRepository defines persistence operations for story cluster storage.
+type StoryClusterRepository interface {
+	Create(ctx context.Context, cluster StoryCluster) (StoryCluster, error)
+	GetByID(ctx context.Context, id int64) (StoryCluster, error)
+	FindByKey(ctx context.Context, clusterKey string) (StoryCluster, error)
+}
+
+// MonetizationHookRepository defines persistence operations for monetization hooks.
+type MonetizationHookRepository interface {
+	Create(ctx context.Context, hook MonetizationHook) (MonetizationHook, error)
+	GetByID(ctx context.Context, id int64) (MonetizationHook, error)
+	ListByDraftID(ctx context.Context, draftID int64, limit int) ([]MonetizationHook, error)
+}
+
 // TopicMemoryRepository defines persistence operations for topic memory.
 type TopicMemoryRepository interface {
 	UpsertMention(ctx context.Context, memory TopicMemory) (TopicMemory, error)

@@ -17,6 +17,8 @@ func TestRepositoriesImplementDomainInterfaces(t *testing.T) {
 	var _ domain.PublishIntentRepository = (*PublishIntentRepository)(nil)
 	var _ domain.ContentAssetRepository = (*ContentAssetRepository)(nil)
 	var _ domain.AssetRelationshipRepository = (*AssetRelationshipRepository)(nil)
+	var _ domain.StoryClusterRepository = (*StoryClusterRepository)(nil)
+	var _ domain.MonetizationHookRepository = (*MonetizationHookRepository)(nil)
 	var _ domain.TopicMemoryRepository = (*TopicMemoryRepository)(nil)
 	var _ domain.ContentRuleRepository = (*ContentRuleRepository)(nil)
 	var _ domain.PerformanceFeedbackRepository = (*PerformanceFeedbackRepository)(nil)
@@ -176,5 +178,55 @@ func TestAssetRelationshipRepositoryRejectsInvalidInput(t *testing.T) {
 	}
 	if _, err := repo.ListByAssetID(context.Background(), 1, 0); err == nil {
 		t.Fatalf("ListByAssetID expected limit validation error")
+	}
+}
+
+func TestStoryClusterRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewStoryClusterRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.StoryCluster{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	if _, err := repo.GetByID(context.Background(), 0); err == nil {
+		t.Fatalf("GetByID expected id validation error")
+	}
+	if _, err := repo.FindByKey(context.Background(), " "); err == nil {
+		t.Fatalf("FindByKey expected key validation error")
+	}
+}
+
+func TestMonetizationHookRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewMonetizationHookRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.MonetizationHook{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	valid := domain.MonetizationHook{
+		DraftID:    1,
+		ChannelID:  1,
+		HookType:   domain.MonetizationHookTypeAffiliateCTA,
+		Disclosure: "affiliate link",
+		CTAText:    "Try it",
+		TargetURL:  "https://example.com",
+	}
+	invalid := []domain.MonetizationHook{
+		{ChannelID: valid.ChannelID, HookType: valid.HookType, Disclosure: valid.Disclosure, CTAText: valid.CTAText, TargetURL: valid.TargetURL},
+		{DraftID: valid.DraftID, HookType: valid.HookType, Disclosure: valid.Disclosure, CTAText: valid.CTAText, TargetURL: valid.TargetURL},
+		{DraftID: valid.DraftID, ChannelID: valid.ChannelID, HookType: "invalid", Disclosure: valid.Disclosure, CTAText: valid.CTAText, TargetURL: valid.TargetURL},
+		{DraftID: valid.DraftID, ChannelID: valid.ChannelID, HookType: valid.HookType, CTAText: valid.CTAText, TargetURL: valid.TargetURL},
+		{DraftID: valid.DraftID, ChannelID: valid.ChannelID, HookType: valid.HookType, Disclosure: valid.Disclosure, TargetURL: valid.TargetURL},
+		{DraftID: valid.DraftID, ChannelID: valid.ChannelID, HookType: valid.HookType, Disclosure: valid.Disclosure, CTAText: valid.CTAText},
+	}
+	for _, hook := range invalid {
+		if _, err := repo.Create(context.Background(), hook); err == nil {
+			t.Fatalf("Create expected validation error for %#v", hook)
+		}
+	}
+	if _, err := repo.GetByID(context.Background(), 0); err == nil {
+		t.Fatalf("GetByID expected id validation error")
+	}
+	if _, err := repo.ListByDraftID(context.Background(), 0, 10); err == nil {
+		t.Fatalf("ListByDraftID expected draft id validation error")
+	}
+	if _, err := repo.ListByDraftID(context.Background(), 1, 0); err == nil {
+		t.Fatalf("ListByDraftID expected limit validation error")
 	}
 }

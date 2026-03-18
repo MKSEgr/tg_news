@@ -86,3 +86,80 @@ func TestAssetRelationshipsMigrationDownDropsTable(t *testing.T) {
 		t.Fatalf("migration down missing DROP TABLE for asset_relationships")
 	}
 }
+
+func TestStoryClustersMigrationUpContainsTableAndIndex(t *testing.T) {
+	path := filepath.Join("000015_story_clusters.up.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+
+	checks := []string{
+		"CREATE TABLE IF NOT EXISTS story_clusters",
+		"cluster_key TEXT NOT NULL UNIQUE",
+		"title TEXT NOT NULL",
+		"summary TEXT NOT NULL",
+		"created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+		"updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+	}
+	for _, want := range checks {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration up missing %q", want)
+		}
+	}
+}
+
+func TestStoryClustersMigrationDownDropsTable(t *testing.T) {
+	path := filepath.Join("000015_story_clusters.down.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+	if !strings.Contains(sql, "DROP TABLE IF EXISTS story_clusters") {
+		t.Fatalf("migration down missing DROP TABLE for story_clusters")
+	}
+}
+
+func TestMonetizationHooksMigrationUpContainsTableAndIndexes(t *testing.T) {
+	path := filepath.Join("000016_monetization_hooks.up.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+
+	checks := []string{
+		"CREATE TABLE IF NOT EXISTS monetization_hooks",
+		"draft_id BIGINT NOT NULL",
+		"channel_id BIGINT NOT NULL",
+		"hook_type TEXT NOT NULL",
+		"CHECK (hook_type IN ('affiliate_cta', 'sponsored_cta'))",
+		"disclosure TEXT NOT NULL",
+		"cta_text TEXT NOT NULL",
+		"target_url TEXT NOT NULL",
+		"created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+		"updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+		"CREATE INDEX IF NOT EXISTS idx_monetization_hooks_draft_id",
+		"CREATE INDEX IF NOT EXISTS idx_monetization_hooks_channel_id",
+		"CREATE INDEX IF NOT EXISTS idx_monetization_hooks_type",
+	}
+	for _, want := range checks {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration up missing %q", want)
+		}
+	}
+}
+
+func TestMonetizationHooksMigrationDownDropsTable(t *testing.T) {
+	path := filepath.Join("000016_monetization_hooks.down.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+	if !strings.Contains(sql, "DROP TABLE IF EXISTS monetization_hooks") {
+		t.Fatalf("migration down missing DROP TABLE for monetization_hooks")
+	}
+}

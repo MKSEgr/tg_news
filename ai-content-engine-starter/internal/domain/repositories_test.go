@@ -62,6 +62,30 @@ func (stubAssetRelationshipRepo) ListByAssetID(context.Context, int64, int) ([]A
 	return nil, nil
 }
 
+type stubStoryClusterRepo struct{}
+
+func (stubStoryClusterRepo) Create(context.Context, StoryCluster) (StoryCluster, error) {
+	return StoryCluster{}, nil
+}
+func (stubStoryClusterRepo) GetByID(context.Context, int64) (StoryCluster, error) {
+	return StoryCluster{}, nil
+}
+func (stubStoryClusterRepo) FindByKey(context.Context, string) (StoryCluster, error) {
+	return StoryCluster{}, nil
+}
+
+type stubMonetizationHookRepo struct{}
+
+func (stubMonetizationHookRepo) Create(context.Context, MonetizationHook) (MonetizationHook, error) {
+	return MonetizationHook{}, nil
+}
+func (stubMonetizationHookRepo) GetByID(context.Context, int64) (MonetizationHook, error) {
+	return MonetizationHook{}, nil
+}
+func (stubMonetizationHookRepo) ListByDraftID(context.Context, int64, int) ([]MonetizationHook, error) {
+	return nil, nil
+}
+
 type stubTopicMemoryRepo struct{}
 
 func (stubTopicMemoryRepo) UpsertMention(context.Context, TopicMemory) (TopicMemory, error) {
@@ -112,6 +136,8 @@ func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ PublishIntentRepository = stubPublishIntentRepo{}
 	var _ ContentAssetRepository = stubContentAssetRepo{}
 	var _ AssetRelationshipRepository = stubAssetRelationshipRepo{}
+	var _ StoryClusterRepository = stubStoryClusterRepo{}
+	var _ MonetizationHookRepository = stubMonetizationHookRepo{}
 }
 
 func TestErrNotFoundIsWrappable(t *testing.T) {

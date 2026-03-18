@@ -124,6 +124,38 @@ type AssetRelationship struct {
 	CreatedAt        time.Time
 }
 
+// StoryCluster groups related content under a stable cluster key.
+type StoryCluster struct {
+	ID         int64
+	ClusterKey string
+	Title      string
+	Summary    string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+// MonetizationHookType defines the supported lightweight monetization hook kinds.
+type MonetizationHookType string
+
+const (
+	MonetizationHookTypeAffiliateCTA MonetizationHookType = "affiliate_cta"
+	MonetizationHookTypeSponsoredCTA MonetizationHookType = "sponsored_cta"
+)
+
+// MonetizationHook stores a future-ready monetization attachment for one draft.
+// V3 intentionally keeps this lightweight: disclosure + CTA text + target URL.
+type MonetizationHook struct {
+	ID         int64
+	DraftID    int64
+	ChannelID  int64
+	HookType   MonetizationHookType
+	Disclosure string
+	CTAText    string
+	TargetURL  string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
 // TopicMemory stores deterministic per-channel topic frequency memory.
 type TopicMemory struct {
 	ID           int64

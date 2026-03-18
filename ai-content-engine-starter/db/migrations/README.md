@@ -20,4 +20,5 @@ Current bootstrap migration:
 - `000009_topic_memory_default_positive` — aligns `topic_memory.mention_count` default with positive-count constraint.
 - `000013_content_assets` — creates minimal content assets storage for future asset-based generation.
 - `000014_asset_relationships` — creates minimal explicit links between assets (`derived_from`, `followup_to`).
+- `000015_story_clusters` — creates minimal story cluster storage keyed by `cluster_key`.
 
