@@ -311,6 +311,23 @@ func (p *plannerStub) PlanForSourceItem(context.Context, domain.SourceItem) ([]d
 	return nil, nil
 }
 
+type routedPlannerStub struct {
+	channelIDs []int64
+	calls      int
+	result     []domain.PublishIntent
+}
+
+func (p *routedPlannerStub) PlanForSourceItem(context.Context, domain.SourceItem) ([]domain.PublishIntent, error) {
+	p.calls++
+	return p.result, nil
+}
+
+func (p *routedPlannerStub) PlanForSourceItemForChannels(_ context.Context, _ domain.SourceItem, channelIDs []int64) ([]domain.PublishIntent, error) {
+	p.calls++
+	p.channelIDs = append([]int64(nil), channelIDs...)
+	return p.result, nil
+}
+
 type assetGeneratorStub struct {
 	calls   int
 	intents []domain.PublishIntent
@@ -380,6 +397,84 @@ func TestCollectorJobRun(t *testing.T) {
 	}
 	if err := job.Run(context.Background()); err != nil {
 		t.Fatalf("Run() error = %v", err)
+	}
+}
+
+func TestPipelineJobRunSkipsClusterObservationWhenNoDraftWorkOrIntentsRemain(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+	observer := &clusterObserverStub{cluster: domain.StoryCluster{ID: 77, Title: "Tool launch"}}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{
+		domain.DraftStatusPending: {{SourceItemID: 11, ChannelID: 7, Variant: "A", Status: domain.DraftStatusPending}},
+	}}
+
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job.WithStoryClusterObserver(observer)
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if observer.calls != 0 {
+		t.Fatalf("observer calls = %d, want 0", observer.calls)
+	}
+}
+
+func TestPipelineJobRunPassesAllowedChannelsToRoutedPlanner(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channels := []domain.Channel{{ID: 1, Slug: "ai-news", Name: "AI News"}, {ID: 2, Slug: "ai-tools", Name: "AI Tools"}}
+	planner := &routedPlannerStub{result: []domain.PublishIntent{{RawItemID: 11, ChannelID: 2, Format: "text", Status: domain.PublishIntentStatusPlanned}}}
+	assetGen := &assetGeneratorStub{}
+
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: channels},
+		&draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}},
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{1, 2}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 2, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		&rulesStub{allowByChannel: map[int64]bool{1: false, 2: true}},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job = job.WithEditorialPlanner(planner).WithIntentAssetGenerator(assetGen)
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if planner.calls != 1 {
+		t.Fatalf("planner calls = %d, want 1", planner.calls)
+	}
+	if len(planner.channelIDs) != 1 || planner.channelIDs[0] != 2 {
+		t.Fatalf("planner channelIDs = %v, want [2]", planner.channelIDs)
+	}
+	if assetGen.calls != 1 || len(assetGen.intents) != 1 || assetGen.intents[0].ChannelID != 2 {
+		t.Fatalf("asset generation intents = %+v", assetGen.intents)
 	}
 }
 

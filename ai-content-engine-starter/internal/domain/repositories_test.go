@@ -118,6 +118,15 @@ func (stubContentRuleRepo) ListEnabled(context.Context, *int64) ([]ContentRule, 
 
 type stubPerformanceFeedbackRepo struct{}
 
+type stubRankingFeatureRepo struct{}
+
+func (stubRankingFeatureRepo) Create(context.Context, RankingFeature) (RankingFeature, error) {
+	return RankingFeature{}, nil
+}
+func (stubRankingFeatureRepo) ListByEntity(context.Context, string, int64, int) ([]RankingFeature, error) {
+	return nil, nil
+}
+
 func (stubPerformanceFeedbackRepo) Upsert(context.Context, PerformanceFeedback) (PerformanceFeedback, error) {
 	return PerformanceFeedback{}, nil
 }
@@ -151,6 +160,7 @@ func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ StoryClusterRepository = stubStoryClusterRepo{}
 	var _ MonetizationHookRepository = stubMonetizationHookRepo{}
 	var _ ClusterEventRepository = stubClusterEventRepo{}
+	var _ RankingFeatureRepository = stubRankingFeatureRepo{}
 }
 
 func TestErrNotFoundIsWrappable(t *testing.T) {

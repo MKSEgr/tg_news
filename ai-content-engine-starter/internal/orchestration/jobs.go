@@ -135,6 +135,10 @@ type editorialPlanner interface {
 	PlanForSourceItem(ctx context.Context, item domain.SourceItem) ([]domain.PublishIntent, error)
 }
 
+type routedEditorialPlanner interface {
+	PlanForSourceItemForChannels(ctx context.Context, item domain.SourceItem, channelIDs []int64) ([]domain.PublishIntent, error)
+}
+
 type intentAssetGenerator interface {
 	GenerateFromIntent(ctx context.Context, intent domain.PublishIntent) (domain.ContentAsset, error)
 }
@@ -461,23 +465,10 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 			}
 
 			cluster := domain.StoryCluster{}
-			if j.clusterObserver != nil {
-				observedCluster, _, observeErr := j.clusterObserver.ObserveSignal(ctx, normalized)
-				if observeErr == nil {
-					cluster = observedCluster
-				}
-			}
 
 			targetIDs, err := j.router.Route(normalized, channels)
 			if memoryRouter, ok := j.router.(memoryAwareRouter); ok {
 				targetIDs, err = memoryRouter.RouteWithMemory(normalized, channels, memoryByChannel)
-			}
-			if clusterRouter, ok := j.router.(clusterAwareRouter); ok && cluster.ID > 0 {
-				clusterIDs, clusterErr := clusterRouter.RouteWithCluster(normalized, channels, cluster)
-				if clusterErr != nil {
-					return fmt.Errorf("route item %d: %w", item.ID, clusterErr)
-				}
-				targetIDs = mergeRankedRouteIDs(targetIDs, clusterIDs)
 			}
 			if feedbackRouter, ok := j.router.(feedbackAwareRouter); ok {
 				feedbackIDs, feedbackErr := feedbackRouter.RouteWithFeedback(normalized, channels, feedbackByChannel)
@@ -490,28 +481,21 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				return fmt.Errorf("route item %d: %w", item.ID, err)
 			}
 
-			allowedTargetIDs := make([]int64, 0, len(targetIDs))
-			for _, channelID := range targetIDs {
-				channel, ok := channelByID[channelID]
-				if !ok {
-					continue
-				}
-				if j.rules != nil {
-					allowed, err := j.rules.EvaluateAllowed(ctx, channelID, pipelineRuleText(normalized))
-					if err != nil {
-						return fmt.Errorf("evaluate content rules for channel %d: %w", channelID, err)
-					}
-					if !allowed {
-						continue
-					}
-				}
-				allowedTargetIDs = append(allowedTargetIDs, channel.ID)
+			allowedTargetIDs, err := filterAllowedRouteIDs(targetIDs, channelByID, ctx, j.rules, normalized)
+			if err != nil {
+				return fmt.Errorf("filter allowed route ids for item %d: %w", item.ID, err)
 			}
 			if len(allowedTargetIDs) == 0 {
 				continue
 			}
+
+			intents := []domain.PublishIntent(nil)
 			if j.planner != nil {
-				intents, _ := j.planner.PlanForSourceItem(ctx, normalized)
+				if routedPlanner, ok := j.planner.(routedEditorialPlanner); ok {
+					intents, _ = routedPlanner.PlanForSourceItemForChannels(ctx, normalized, allowedTargetIDs)
+				} else {
+					intents, _ = j.planner.PlanForSourceItem(ctx, normalized)
+				}
 				if j.assetGenerator != nil {
 					allowedIntentChannels := make(map[int64]struct{}, len(allowedTargetIDs))
 					for _, channelID := range allowedTargetIDs {
@@ -523,6 +507,31 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 						}
 						_, _ = j.assetGenerator.GenerateFromIntent(ctx, intent)
 					}
+				}
+			}
+
+			if len(intents) == 0 && !hasDraftWorkForChannels(normalized.ID, allowedTargetIDs, existing, j.generator) {
+				continue
+			}
+
+			if j.clusterObserver != nil {
+				observedCluster, _, observeErr := j.clusterObserver.ObserveSignal(ctx, normalized)
+				if observeErr == nil {
+					cluster = observedCluster
+				}
+			}
+			if clusterRouter, ok := j.router.(clusterAwareRouter); ok && cluster.ID > 0 {
+				clusterIDs, clusterErr := clusterRouter.RouteWithCluster(normalized, channels, cluster)
+				if clusterErr != nil {
+					return fmt.Errorf("route item %d: %w", item.ID, clusterErr)
+				}
+				targetIDs = mergeRankedRouteIDs(targetIDs, clusterIDs)
+				allowedTargetIDs, err = filterAllowedRouteIDs(targetIDs, channelByID, ctx, j.rules, normalized)
+				if err != nil {
+					return fmt.Errorf("filter allowed route ids for item %d: %w", item.ID, err)
+				}
+				if len(allowedTargetIDs) == 0 {
+					continue
 				}
 			}
 
@@ -649,6 +658,52 @@ func filterRouteIDs(ids []int64, allowed []int64) []int64 {
 		}
 	}
 	return out
+}
+
+func hasDraftWorkForChannels(sourceItemID int64, channelIDs []int64, existing map[draftKey]struct{}, generator draftGenerator) bool {
+	variantAware := false
+	if _, ok := generator.(variantAwareGenerator); ok {
+		variantAware = true
+	}
+	if !variantAware {
+		variantAware = implementsClusterAwareVariants(generator)
+	}
+	for _, channelID := range channelIDs {
+		keyA := draftKey{SourceItemID: sourceItemID, ChannelID: channelID, Variant: "A"}
+		if !variantAware {
+			if _, ok := existing[keyA]; !ok {
+				return true
+			}
+			continue
+		}
+		_, hasA := existing[keyA]
+		_, hasB := existing[draftKey{SourceItemID: sourceItemID, ChannelID: channelID, Variant: "B"}]
+		if !hasA || !hasB {
+			return true
+		}
+	}
+	return false
+}
+
+func filterAllowedRouteIDs(targetIDs []int64, channelByID map[int64]domain.Channel, ctx context.Context, rules contentRuleEvaluator, item domain.SourceItem) ([]int64, error) {
+	allowedTargetIDs := make([]int64, 0, len(targetIDs))
+	for _, channelID := range targetIDs {
+		channel, ok := channelByID[channelID]
+		if !ok {
+			continue
+		}
+		if rules != nil {
+			allowed, err := rules.EvaluateAllowed(ctx, channelID, pipelineRuleText(item))
+			if err != nil {
+				return nil, fmt.Errorf("evaluate content rules for channel %d: %w", channelID, err)
+			}
+			if !allowed {
+				continue
+			}
+		}
+		allowedTargetIDs = append(allowedTargetIDs, channel.ID)
+	}
+	return allowedTargetIDs, nil
 }
 
 func pipelineRuleText(item domain.SourceItem) string {

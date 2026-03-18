@@ -79,3 +79,10 @@ func TestClusterEventTypesAreStable(t *testing.T) {
 		t.Fatalf("ClusterEventTypeAssetAdded = %q, want %q", ClusterEventTypeAssetAdded, "asset_added")
 	}
 }
+
+func TestRankingFeatureDefaults(t *testing.T) {
+	feature := RankingFeature{}
+	if feature.FeatureValue != 0 {
+		t.Fatalf("RankingFeature.FeatureValue = %f, want 0", feature.FeatureValue)
+	}
+}

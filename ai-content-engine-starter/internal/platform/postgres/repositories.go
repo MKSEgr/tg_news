@@ -1209,3 +1209,81 @@ func (r *ClusterEventRepository) ListByClusterID(ctx context.Context, storyClust
 	}
 	return events, nil
 }
+
+type RankingFeatureRepository struct{ db *sql.DB }
+
+func NewRankingFeatureRepository(db *sql.DB) *RankingFeatureRepository {
+	return &RankingFeatureRepository{db: db}
+}
+
+func (r *RankingFeatureRepository) Create(ctx context.Context, feature domain.RankingFeature) (domain.RankingFeature, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.RankingFeature{}, err
+	}
+	feature.EntityType = strings.ToLower(strings.TrimSpace(feature.EntityType))
+	if feature.EntityType == "" {
+		return domain.RankingFeature{}, fmt.Errorf("entity type is empty")
+	}
+	if feature.EntityID <= 0 {
+		return domain.RankingFeature{}, fmt.Errorf("entity id must be greater than zero")
+	}
+	feature.FeatureName = strings.TrimSpace(feature.FeatureName)
+	if feature.FeatureName == "" {
+		return domain.RankingFeature{}, fmt.Errorf("feature name is empty")
+	}
+	if math.IsNaN(feature.FeatureValue) || math.IsInf(feature.FeatureValue, 0) {
+		return domain.RankingFeature{}, fmt.Errorf("feature value is invalid")
+	}
+	if feature.CalculatedAt.IsZero() {
+		return domain.RankingFeature{}, fmt.Errorf("calculated at is zero")
+	}
+
+	const q = `INSERT INTO ranking_features (entity_type, entity_id, feature_name, feature_value, calculated_at)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, entity_type, entity_id, feature_name, feature_value, calculated_at`
+	row := r.db.QueryRowContext(ctx, q, feature.EntityType, feature.EntityID, feature.FeatureName, feature.FeatureValue, feature.CalculatedAt)
+	if err := row.Scan(&feature.ID, &feature.EntityType, &feature.EntityID, &feature.FeatureName, &feature.FeatureValue, &feature.CalculatedAt); err != nil {
+		return domain.RankingFeature{}, fmt.Errorf("create ranking feature: %w", err)
+	}
+	return feature, nil
+}
+
+func (r *RankingFeatureRepository) ListByEntity(ctx context.Context, entityType string, entityID int64, limit int) ([]domain.RankingFeature, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	entityType = strings.ToLower(strings.TrimSpace(entityType))
+	if entityType == "" {
+		return nil, fmt.Errorf("entity type is empty")
+	}
+	if entityID <= 0 {
+		return nil, fmt.Errorf("entity id must be greater than zero")
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, entity_type, entity_id, feature_name, feature_value, calculated_at
+		FROM ranking_features
+		WHERE entity_type = $1 AND entity_id = $2
+		ORDER BY calculated_at DESC, id DESC
+		LIMIT $3`
+	rows, err := r.db.QueryContext(ctx, q, entityType, entityID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list ranking features by entity: %w", err)
+	}
+	defer rows.Close()
+
+	features := make([]domain.RankingFeature, 0)
+	for rows.Next() {
+		var feature domain.RankingFeature
+		if err := rows.Scan(&feature.ID, &feature.EntityType, &feature.EntityID, &feature.FeatureName, &feature.FeatureValue, &feature.CalculatedAt); err != nil {
+			return nil, fmt.Errorf("scan ranking feature: %w", err)
+		}
+		features = append(features, feature)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ranking features: %w", err)
+	}
+	return features, nil
+}

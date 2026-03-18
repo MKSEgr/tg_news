@@ -96,3 +96,9 @@ type PerformanceFeedbackRepository interface {
 	Upsert(ctx context.Context, feedback PerformanceFeedback) (PerformanceFeedback, error)
 	GetByDraftID(ctx context.Context, draftID int64) (PerformanceFeedback, error)
 }
+
+// RankingFeatureRepository defines persistence operations for lightweight ranking signals.
+type RankingFeatureRepository interface {
+	Create(ctx context.Context, feature RankingFeature) (RankingFeature, error)
+	ListByEntity(ctx context.Context, entityType string, entityID int64, limit int) ([]RankingFeature, error)
+}

@@ -220,3 +220,13 @@ type PerformanceFeedback struct {
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
+
+// RankingFeature stores flexible numeric ranking signals for later adaptive scoring.
+type RankingFeature struct {
+	ID           int64
+	EntityType   string
+	EntityID     int64
+	FeatureName  string
+	FeatureValue float64
+	CalculatedAt time.Time
+}

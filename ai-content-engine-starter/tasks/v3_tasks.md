@@ -10,3 +10,4 @@
 - [x] V3-008 Implement cluster events
 - [x] V3-009 Implement deterministic cluster detection
 - [x] V3-010 Integrate clusters into routing and generation
+- [x] V3-011 Implement ranking features storage

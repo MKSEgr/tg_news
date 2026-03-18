@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"math"
 	"testing"
 	"time"
 
@@ -308,5 +309,39 @@ func TestClusterEventRepositoryRejectsInvalidInput(t *testing.T) {
 		AssetID:        &validAssetID,
 	}); err == nil {
 		t.Fatalf("Create expected asset_added raw item id validation error")
+	}
+}
+
+func TestRankingFeatureRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewRankingFeatureRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.RankingFeature{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.RankingFeature{
+		EntityType:   "draft",
+		EntityID:     1,
+		FeatureName:  "score",
+		FeatureValue: math.NaN(),
+		CalculatedAt: time.Now().UTC(),
+	}); err == nil {
+		t.Fatalf("Create expected invalid feature value error")
+	}
+	if _, err := repo.Create(context.Background(), domain.RankingFeature{
+		EntityType:   "draft",
+		EntityID:     1,
+		FeatureName:  "score",
+		FeatureValue: math.Inf(1),
+		CalculatedAt: time.Now().UTC(),
+	}); err == nil {
+		t.Fatalf("Create expected infinite feature value error")
+	}
+	if _, err := repo.ListByEntity(context.Background(), "", 1, 10); err == nil {
+		t.Fatalf("ListByEntity expected entity type validation error")
+	}
+	if _, err := repo.ListByEntity(context.Background(), "draft", 0, 10); err == nil {
+		t.Fatalf("ListByEntity expected entity id validation error")
+	}
+	if _, err := repo.ListByEntity(context.Background(), "draft", 1, 0); err == nil {
+		t.Fatalf("ListByEntity expected limit validation error")
 	}
 }

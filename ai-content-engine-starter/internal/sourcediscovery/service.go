@@ -22,15 +22,14 @@ type Service struct {
 	rules         channelRuleEvaluator
 }
 
-// ChannelMetrics contains minimal analytics fields required by discovery integration.
-type ChannelMetrics struct {
+type analyticsSummaryBuilder interface {
+	BuildByChannelMetrics(ctx context.Context) ([]analyticsSummary, error)
+}
+
+type analyticsSummary struct {
 	ChannelID      int64
 	FeedbackDrafts int
 	AvgScore       float64
-}
-
-type analyticsSummaryBuilder interface {
-	BuildByChannelMetrics(ctx context.Context) ([]ChannelMetrics, error)
 }
 
 type channelRuleEvaluator interface {

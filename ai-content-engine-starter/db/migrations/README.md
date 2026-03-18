@@ -23,3 +23,4 @@ Current bootstrap migration:
 - `000015_story_clusters` — creates minimal story cluster storage keyed by `cluster_key`.
 - `000016_monetization_hooks` — creates lightweight draft monetization hook storage.
 - `000017_cluster_events` — creates append-only cluster event storage for signal and asset references over time.
+- `000018_ranking_features` — creates lightweight ranking feature storage keyed by entity type/id and feature name.

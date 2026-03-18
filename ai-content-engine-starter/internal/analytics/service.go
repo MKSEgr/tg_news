@@ -135,3 +135,8 @@ func (s *Service) BuildByChannel(ctx context.Context) ([]ChannelSummary, error) 
 
 	return out, nil
 }
+
+// BuildByChannelMetrics adapts analytics summaries for source discovery integration.
+func (s *Service) BuildByChannelMetrics(ctx context.Context) ([]ChannelSummary, error) {
+	return s.BuildByChannel(ctx)
+}

@@ -204,3 +204,43 @@ func TestClusterEventsMigrationDownDropsTable(t *testing.T) {
 		t.Fatalf("migration down missing DROP TABLE for cluster_events")
 	}
 }
+
+
+func TestRankingFeaturesMigrationUpContainsTableAndIndexes(t *testing.T) {
+	path := filepath.Join("000018_ranking_features.up.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+
+	checks := []string{
+		"CREATE TABLE IF NOT EXISTS ranking_features",
+		"entity_type TEXT NOT NULL",
+		"entity_id BIGINT NOT NULL",
+		"feature_name TEXT NOT NULL",
+		"feature_value DOUBLE PRECISION NOT NULL",
+		"calculated_at TIMESTAMPTZ NOT NULL",
+		"created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+		"CREATE INDEX IF NOT EXISTS idx_ranking_features_entity",
+		"CREATE INDEX IF NOT EXISTS idx_ranking_features_feature_name",
+		"CREATE INDEX IF NOT EXISTS idx_ranking_features_calculated_at",
+	}
+	for _, want := range checks {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration up missing %q", want)
+		}
+	}
+}
+
+func TestRankingFeaturesMigrationDownDropsTable(t *testing.T) {
+	path := filepath.Join("000018_ranking_features.down.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+	if !strings.Contains(sql, "DROP TABLE IF EXISTS ranking_features") {
+		t.Fatalf("migration down missing DROP TABLE for ranking_features")
+	}
+}

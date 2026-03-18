@@ -15,11 +15,11 @@ type sourceRepoStub struct {
 }
 
 type analyticsStub struct {
-	summaries []ChannelMetrics
+	summaries []analyticsSummary
 	err       error
 }
 
-func (s *analyticsStub) BuildByChannelMetrics(context.Context) ([]ChannelMetrics, error) {
+func (s *analyticsStub) BuildByChannelMetrics(context.Context) ([]analyticsSummary, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -152,7 +152,7 @@ func TestDiscoverForChannelSkipsWhenAnalyticsScoreIsBelowThreshold(t *testing.T)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	svc.WithAnalytics(&analyticsStub{summaries: []ChannelMetrics{{ChannelID: 9, FeedbackDrafts: 2, AvgScore: 0.1}}})
+	svc.WithAnalytics(&analyticsStub{summaries: []analyticsSummary{{ChannelID: 9, FeedbackDrafts: 2, AvgScore: 0.1}}})
 
 	got, err := svc.DiscoverForChannel(context.Background(), 9, []domain.SourceItem{{URL: "https://open.example/feed.xml"}})
 	if err != nil {

@@ -131,6 +131,44 @@ func (s *Service) PlanForSourceItem(ctx context.Context, item domain.SourceItem)
 	return s.PlanForItem(ctx, RawItem{ID: item.ID, URL: item.URL, Title: item.Title, Body: item.Body})
 }
 
+// PlanForSourceItemForChannels plans using a caller-provided ordered channel shortlist.
+func (s *Service) PlanForSourceItemForChannels(ctx context.Context, item domain.SourceItem, channelIDs []int64) ([]PublishIntent, error) {
+	if len(channelIDs) == 0 {
+		return []PublishIntent{}, nil
+	}
+	if s == nil {
+		return nil, fmt.Errorf("editorial planner service is nil")
+	}
+	if ctx == nil {
+		return nil, fmt.Errorf("context is nil")
+	}
+	if item.ID <= 0 {
+		return nil, fmt.Errorf("raw item id is invalid")
+	}
+	priority := s.scorer.Score(item)
+	if priority <= 0 {
+		return []PublishIntent{}, nil
+	}
+	channelID, ok := firstValidChannelID(channelIDs)
+	if !ok {
+		return []PublishIntent{}, nil
+	}
+	existing, err := s.repo.ListByRawItemID(ctx, item.ID, 10)
+	if err != nil {
+		return nil, fmt.Errorf("list publish intents by raw item id: %w", err)
+	}
+	for _, intent := range existing {
+		if intent.ChannelID == channelID {
+			return []PublishIntent{}, nil
+		}
+	}
+	created, err := s.repo.Create(ctx, domain.PublishIntent{RawItemID: item.ID, ChannelID: channelID, Format: defaultIntentFormat, Priority: priority, Status: domain.PublishIntentStatusPlanned})
+	if err != nil {
+		return nil, fmt.Errorf("create publish intent: %w", err)
+	}
+	return []PublishIntent{created}, nil
+}
+
 func firstValidChannelID(ids []int64) (int64, bool) {
 	for _, id := range ids {
 		if id > 0 {
