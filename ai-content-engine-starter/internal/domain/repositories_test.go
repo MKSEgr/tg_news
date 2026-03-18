@@ -155,6 +155,29 @@ func (stubPublishIntentRepo) UpdateStatus(context.Context, int64, PublishIntentS
 	return nil
 }
 
+type stubSponsorRepo struct{}
+
+func (stubSponsorRepo) Create(context.Context, Sponsor) (Sponsor, error) { return Sponsor{}, nil }
+func (stubSponsorRepo) GetByID(context.Context, int64) (Sponsor, error)  { return Sponsor{}, nil }
+func (stubSponsorRepo) List(context.Context, int) ([]Sponsor, error)     { return nil, nil }
+
+type stubAdCampaignRepo struct{}
+
+func (stubAdCampaignRepo) Create(context.Context, AdCampaign) (AdCampaign, error) {
+	return AdCampaign{}, nil
+}
+func (stubAdCampaignRepo) GetByID(context.Context, int64) (AdCampaign, error) {
+	return AdCampaign{}, nil
+}
+func (stubAdCampaignRepo) List(context.Context, int) ([]AdCampaign, error) { return nil, nil }
+
+type stubAdSlotRepo struct{}
+
+func (stubAdSlotRepo) Create(context.Context, AdSlot) (AdSlot, error) { return AdSlot{}, nil }
+func (stubAdSlotRepo) ListByChannel(context.Context, int64, int) ([]AdSlot, error) {
+	return nil, nil
+}
+
 func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ ChannelRepository = stubChannelRepo{}
 	var _ ChannelRelationshipRepository = stubChannelRelationshipRepo{}
@@ -169,6 +192,9 @@ func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ AssetRelationshipRepository = stubAssetRelationshipRepo{}
 	var _ StoryClusterRepository = stubStoryClusterRepo{}
 	var _ MonetizationHookRepository = stubMonetizationHookRepo{}
+	var _ SponsorRepository = stubSponsorRepo{}
+	var _ AdCampaignRepository = stubAdCampaignRepo{}
+	var _ AdSlotRepository = stubAdSlotRepo{}
 	var _ ClusterEventRepository = stubClusterEventRepo{}
 	var _ RankingFeatureRepository = stubRankingFeatureRepo{}
 }

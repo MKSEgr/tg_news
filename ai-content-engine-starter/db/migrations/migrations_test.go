@@ -232,6 +232,123 @@ func TestRankingFeaturesMigrationUpContainsTableAndIndexes(t *testing.T) {
 	}
 }
 
+func TestSponsorsMigrationUpContainsTableAndIndexes(t *testing.T) {
+	path := filepath.Join("000021_sponsors.up.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+
+	checks := []string{
+		"CREATE TABLE IF NOT EXISTS sponsors",
+		"name TEXT NOT NULL",
+		"status TEXT NOT NULL",
+		"CHECK (status IN ('active', 'inactive'))",
+		"contact_info TEXT NOT NULL",
+		"created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+		"CREATE INDEX IF NOT EXISTS idx_sponsors_status",
+		"CREATE INDEX IF NOT EXISTS idx_sponsors_name",
+	}
+	for _, want := range checks {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration up missing %q", want)
+		}
+	}
+}
+
+func TestSponsorsMigrationDownDropsTable(t *testing.T) {
+	path := filepath.Join("000021_sponsors.down.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+	if !strings.Contains(sql, "DROP TABLE IF EXISTS sponsors") {
+		t.Fatalf("migration down missing DROP TABLE for sponsors")
+	}
+}
+
+func TestAdCampaignsMigrationUpContainsTableAndIndexes(t *testing.T) {
+	path := filepath.Join("000022_ad_campaigns.up.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+
+	checks := []string{
+		"CREATE TABLE IF NOT EXISTS ad_campaigns",
+		"sponsor_id BIGINT NOT NULL",
+		"campaign_name TEXT NOT NULL",
+		"campaign_type TEXT NOT NULL",
+		"CHECK (campaign_type IN ('sponsored_post', 'branding'))",
+		"status TEXT NOT NULL",
+		"CHECK (status IN ('draft', 'active', 'paused', 'ended'))",
+		"start_at TIMESTAMPTZ NOT NULL",
+		"end_at TIMESTAMPTZ NOT NULL",
+		"CREATE INDEX IF NOT EXISTS idx_ad_campaigns_sponsor_id",
+		"CREATE INDEX IF NOT EXISTS idx_ad_campaigns_status",
+	}
+	for _, want := range checks {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration up missing %q", want)
+		}
+	}
+}
+
+func TestAdCampaignsMigrationDownDropsTable(t *testing.T) {
+	path := filepath.Join("000022_ad_campaigns.down.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+	if !strings.Contains(sql, "DROP TABLE IF EXISTS ad_campaigns") {
+		t.Fatalf("migration down missing DROP TABLE for ad_campaigns")
+	}
+}
+
+func TestAdSlotsMigrationUpContainsTableAndIndexes(t *testing.T) {
+	path := filepath.Join("000023_ad_slots.up.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+
+	checks := []string{
+		"CREATE TABLE IF NOT EXISTS ad_slots",
+		"channel_id BIGINT NOT NULL",
+		"scheduled_at TIMESTAMPTZ NOT NULL",
+		"slot_type TEXT NOT NULL",
+		"CHECK (slot_type IN ('sponsored_post', 'branding'))",
+		"campaign_id BIGINT NOT NULL",
+		"status TEXT NOT NULL",
+		"CHECK (status IN ('scheduled', 'cancelled'))",
+		"CREATE INDEX IF NOT EXISTS idx_ad_slots_channel_id",
+		"CREATE INDEX IF NOT EXISTS idx_ad_slots_scheduled_at",
+		"CREATE INDEX IF NOT EXISTS idx_ad_slots_campaign_id",
+	}
+	for _, want := range checks {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration up missing %q", want)
+		}
+	}
+}
+
+func TestAdSlotsMigrationDownDropsTable(t *testing.T) {
+	path := filepath.Join("000023_ad_slots.down.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+	if !strings.Contains(sql, "DROP TABLE IF EXISTS ad_slots") {
+		t.Fatalf("migration down missing DROP TABLE for ad_slots")
+	}
+}
+
 func TestRankingFeaturesMigrationDownDropsTable(t *testing.T) {
 	path := filepath.Join("000018_ranking_features.down.sql")
 	body, err := os.ReadFile(path)

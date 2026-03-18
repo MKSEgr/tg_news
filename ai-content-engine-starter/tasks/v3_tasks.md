@@ -16,3 +16,6 @@
 - [x] V3-014 Implement channel relationships
 - [x] V3-015 Implement network scheduler
 - [x] V3-016 Implement cross-channel topic balancing
+- [x] V3-017 Implement sponsors
+- [x] V3-018 Implement ad campaigns
+- [x] V3-019 Implement ad slot scheduling

@@ -176,6 +176,78 @@ type MonetizationHook struct {
 	UpdatedAt  time.Time
 }
 
+// SponsorStatus defines the supported lightweight sponsor lifecycle states.
+type SponsorStatus string
+
+const (
+	SponsorStatusActive   SponsorStatus = "active"
+	SponsorStatusInactive SponsorStatus = "inactive"
+)
+
+// Sponsor stores a minimal monetization entity without campaign or billing logic.
+type Sponsor struct {
+	ID          int64
+	Name        string
+	Status      SponsorStatus
+	ContactInfo string
+	CreatedAt   time.Time
+}
+
+// AdCampaignType defines the supported lightweight campaign types.
+type AdCampaignType string
+
+const (
+	AdCampaignTypeSponsoredPost AdCampaignType = "sponsored_post"
+	AdCampaignTypeBranding      AdCampaignType = "branding"
+)
+
+// AdCampaignStatus defines the supported lightweight campaign lifecycle states.
+type AdCampaignStatus string
+
+const (
+	AdCampaignStatusDraft  AdCampaignStatus = "draft"
+	AdCampaignStatusActive AdCampaignStatus = "active"
+	AdCampaignStatusPaused AdCampaignStatus = "paused"
+	AdCampaignStatusEnded  AdCampaignStatus = "ended"
+)
+
+// AdCampaign stores a simple sponsor-linked campaign without targeting or delivery logic.
+type AdCampaign struct {
+	ID           int64
+	SponsorID    int64
+	CampaignName string
+	CampaignType AdCampaignType
+	Status       AdCampaignStatus
+	StartAt      time.Time
+	EndAt        time.Time
+}
+
+// AdSlotType defines the supported explicit ad slot shapes.
+type AdSlotType string
+
+const (
+	AdSlotTypeSponsoredPost AdSlotType = "sponsored_post"
+	AdSlotTypeBranding      AdSlotType = "branding"
+)
+
+// AdSlotStatus defines the supported explicit ad slot states.
+type AdSlotStatus string
+
+const (
+	AdSlotStatusScheduled AdSlotStatus = "scheduled"
+	AdSlotStatusCancelled AdSlotStatus = "cancelled"
+)
+
+// AdSlot stores an explicit campaign scheduling slot for one channel at one time.
+type AdSlot struct {
+	ID          int64
+	ChannelID   int64
+	ScheduledAt time.Time
+	SlotType    AdSlotType
+	CampaignID  int64
+	Status      AdSlotStatus
+}
+
 // ClusterEventType defines the supported append-only cluster event kinds.
 type ClusterEventType string
 

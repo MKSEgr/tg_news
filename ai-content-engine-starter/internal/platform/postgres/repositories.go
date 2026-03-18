@@ -61,6 +61,21 @@ type MonetizationHookRepository struct {
 	db *sql.DB
 }
 
+// SponsorRepository is a PostgreSQL implementation of domain.SponsorRepository.
+type SponsorRepository struct {
+	db *sql.DB
+}
+
+// AdCampaignRepository is a PostgreSQL implementation of domain.AdCampaignRepository.
+type AdCampaignRepository struct {
+	db *sql.DB
+}
+
+// AdSlotRepository is a PostgreSQL implementation of domain.AdSlotRepository.
+type AdSlotRepository struct {
+	db *sql.DB
+}
+
 // ClusterEventRepository is a PostgreSQL implementation of domain.ClusterEventRepository.
 type ClusterEventRepository struct {
 	db *sql.DB
@@ -103,6 +118,9 @@ func NewStoryClusterRepository(db *sql.DB) *StoryClusterRepository {
 func NewMonetizationHookRepository(db *sql.DB) *MonetizationHookRepository {
 	return &MonetizationHookRepository{db: db}
 }
+func NewSponsorRepository(db *sql.DB) *SponsorRepository       { return &SponsorRepository{db: db} }
+func NewAdCampaignRepository(db *sql.DB) *AdCampaignRepository { return &AdCampaignRepository{db: db} }
+func NewAdSlotRepository(db *sql.DB) *AdSlotRepository         { return &AdSlotRepository{db: db} }
 func NewClusterEventRepository(db *sql.DB) *ClusterEventRepository {
 	return &ClusterEventRepository{db: db}
 }
@@ -1205,6 +1223,245 @@ func (r *MonetizationHookRepository) ListByDraftID(ctx context.Context, draftID 
 		return nil, fmt.Errorf("iterate monetization hooks: %w", err)
 	}
 	return hooks, nil
+}
+
+func (r *SponsorRepository) Create(ctx context.Context, sponsor domain.Sponsor) (domain.Sponsor, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.Sponsor{}, err
+	}
+	sponsor.Name = strings.TrimSpace(sponsor.Name)
+	if sponsor.Name == "" {
+		return domain.Sponsor{}, fmt.Errorf("sponsor name is empty")
+	}
+	sponsor.Status = domain.SponsorStatus(strings.ToLower(strings.TrimSpace(string(sponsor.Status))))
+	if sponsor.Status != domain.SponsorStatusActive && sponsor.Status != domain.SponsorStatusInactive {
+		return domain.Sponsor{}, fmt.Errorf("sponsor status is invalid")
+	}
+	sponsor.ContactInfo = strings.TrimSpace(sponsor.ContactInfo)
+	if sponsor.ContactInfo == "" {
+		return domain.Sponsor{}, fmt.Errorf("contact info is empty")
+	}
+
+	const q = `INSERT INTO sponsors (name, status, contact_info)
+		VALUES ($1, $2, $3)
+		RETURNING id, name, status, contact_info, created_at`
+	row := r.db.QueryRowContext(ctx, q, sponsor.Name, sponsor.Status, sponsor.ContactInfo)
+	if err := row.Scan(&sponsor.ID, &sponsor.Name, &sponsor.Status, &sponsor.ContactInfo, &sponsor.CreatedAt); err != nil {
+		return domain.Sponsor{}, fmt.Errorf("create sponsor: %w", err)
+	}
+	return sponsor, nil
+}
+
+func (r *SponsorRepository) GetByID(ctx context.Context, id int64) (domain.Sponsor, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.Sponsor{}, err
+	}
+	if id <= 0 {
+		return domain.Sponsor{}, fmt.Errorf("sponsor id must be greater than zero")
+	}
+
+	const q = `SELECT id, name, status, contact_info, created_at FROM sponsors WHERE id = $1`
+	var sponsor domain.Sponsor
+	row := r.db.QueryRowContext(ctx, q, id)
+	if err := row.Scan(&sponsor.ID, &sponsor.Name, &sponsor.Status, &sponsor.ContactInfo, &sponsor.CreatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Sponsor{}, domain.ErrNotFound
+		}
+		return domain.Sponsor{}, fmt.Errorf("get sponsor by id: %w", err)
+	}
+	return sponsor, nil
+}
+
+func (r *SponsorRepository) List(ctx context.Context, limit int) ([]domain.Sponsor, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, name, status, contact_info, created_at
+		FROM sponsors
+		ORDER BY id DESC
+		LIMIT $1`
+	rows, err := r.db.QueryContext(ctx, q, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list sponsors: %w", err)
+	}
+	defer rows.Close()
+
+	sponsors := make([]domain.Sponsor, 0)
+	for rows.Next() {
+		var sponsor domain.Sponsor
+		if err := rows.Scan(&sponsor.ID, &sponsor.Name, &sponsor.Status, &sponsor.ContactInfo, &sponsor.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan sponsor: %w", err)
+		}
+		sponsors = append(sponsors, sponsor)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate sponsors: %w", err)
+	}
+	return sponsors, nil
+}
+
+func (r *AdCampaignRepository) Create(ctx context.Context, campaign domain.AdCampaign) (domain.AdCampaign, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.AdCampaign{}, err
+	}
+	if campaign.SponsorID <= 0 {
+		return domain.AdCampaign{}, fmt.Errorf("sponsor id must be greater than zero")
+	}
+	campaign.CampaignName = strings.TrimSpace(campaign.CampaignName)
+	if campaign.CampaignName == "" {
+		return domain.AdCampaign{}, fmt.Errorf("campaign name is empty")
+	}
+	campaign.CampaignType = domain.AdCampaignType(strings.ToLower(strings.TrimSpace(string(campaign.CampaignType))))
+	if campaign.CampaignType != domain.AdCampaignTypeSponsoredPost && campaign.CampaignType != domain.AdCampaignTypeBranding {
+		return domain.AdCampaign{}, fmt.Errorf("campaign type is invalid")
+	}
+	campaign.Status = domain.AdCampaignStatus(strings.ToLower(strings.TrimSpace(string(campaign.Status))))
+	if campaign.Status != domain.AdCampaignStatusDraft && campaign.Status != domain.AdCampaignStatusActive && campaign.Status != domain.AdCampaignStatusPaused && campaign.Status != domain.AdCampaignStatusEnded {
+		return domain.AdCampaign{}, fmt.Errorf("campaign status is invalid")
+	}
+	if campaign.StartAt.IsZero() {
+		return domain.AdCampaign{}, fmt.Errorf("start time is zero")
+	}
+	if campaign.EndAt.IsZero() {
+		return domain.AdCampaign{}, fmt.Errorf("end time is zero")
+	}
+	if campaign.EndAt.Before(campaign.StartAt) {
+		return domain.AdCampaign{}, fmt.Errorf("end time must be greater than or equal to start time")
+	}
+
+	const q = `INSERT INTO ad_campaigns (sponsor_id, campaign_name, campaign_type, status, start_at, end_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, sponsor_id, campaign_name, campaign_type, status, start_at, end_at`
+	row := r.db.QueryRowContext(ctx, q, campaign.SponsorID, campaign.CampaignName, campaign.CampaignType, campaign.Status, campaign.StartAt.UTC(), campaign.EndAt.UTC())
+	if err := row.Scan(&campaign.ID, &campaign.SponsorID, &campaign.CampaignName, &campaign.CampaignType, &campaign.Status, &campaign.StartAt, &campaign.EndAt); err != nil {
+		return domain.AdCampaign{}, fmt.Errorf("create ad campaign: %w", err)
+	}
+	return campaign, nil
+}
+
+func (r *AdCampaignRepository) GetByID(ctx context.Context, id int64) (domain.AdCampaign, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.AdCampaign{}, err
+	}
+	if id <= 0 {
+		return domain.AdCampaign{}, fmt.Errorf("ad campaign id must be greater than zero")
+	}
+
+	const q = `SELECT id, sponsor_id, campaign_name, campaign_type, status, start_at, end_at
+		FROM ad_campaigns WHERE id = $1`
+	var campaign domain.AdCampaign
+	row := r.db.QueryRowContext(ctx, q, id)
+	if err := row.Scan(&campaign.ID, &campaign.SponsorID, &campaign.CampaignName, &campaign.CampaignType, &campaign.Status, &campaign.StartAt, &campaign.EndAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.AdCampaign{}, domain.ErrNotFound
+		}
+		return domain.AdCampaign{}, fmt.Errorf("get ad campaign by id: %w", err)
+	}
+	return campaign, nil
+}
+
+func (r *AdCampaignRepository) List(ctx context.Context, limit int) ([]domain.AdCampaign, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, sponsor_id, campaign_name, campaign_type, status, start_at, end_at
+		FROM ad_campaigns
+		ORDER BY id DESC
+		LIMIT $1`
+	rows, err := r.db.QueryContext(ctx, q, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list ad campaigns: %w", err)
+	}
+	defer rows.Close()
+
+	campaigns := make([]domain.AdCampaign, 0)
+	for rows.Next() {
+		var campaign domain.AdCampaign
+		if err := rows.Scan(&campaign.ID, &campaign.SponsorID, &campaign.CampaignName, &campaign.CampaignType, &campaign.Status, &campaign.StartAt, &campaign.EndAt); err != nil {
+			return nil, fmt.Errorf("scan ad campaign: %w", err)
+		}
+		campaigns = append(campaigns, campaign)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ad campaigns: %w", err)
+	}
+	return campaigns, nil
+}
+
+func (r *AdSlotRepository) Create(ctx context.Context, slot domain.AdSlot) (domain.AdSlot, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.AdSlot{}, err
+	}
+	if slot.ChannelID <= 0 {
+		return domain.AdSlot{}, fmt.Errorf("channel id must be greater than zero")
+	}
+	if slot.ScheduledAt.IsZero() {
+		return domain.AdSlot{}, fmt.Errorf("scheduled time is zero")
+	}
+	slot.SlotType = domain.AdSlotType(strings.ToLower(strings.TrimSpace(string(slot.SlotType))))
+	if slot.SlotType != domain.AdSlotTypeSponsoredPost && slot.SlotType != domain.AdSlotTypeBranding {
+		return domain.AdSlot{}, fmt.Errorf("slot type is invalid")
+	}
+	if slot.CampaignID <= 0 {
+		return domain.AdSlot{}, fmt.Errorf("campaign id must be greater than zero")
+	}
+	slot.Status = domain.AdSlotStatus(strings.ToLower(strings.TrimSpace(string(slot.Status))))
+	if slot.Status != domain.AdSlotStatusScheduled && slot.Status != domain.AdSlotStatusCancelled {
+		return domain.AdSlot{}, fmt.Errorf("slot status is invalid")
+	}
+
+	const q = `INSERT INTO ad_slots (channel_id, scheduled_at, slot_type, campaign_id, status)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, channel_id, scheduled_at, slot_type, campaign_id, status`
+	row := r.db.QueryRowContext(ctx, q, slot.ChannelID, slot.ScheduledAt.UTC(), slot.SlotType, slot.CampaignID, slot.Status)
+	if err := row.Scan(&slot.ID, &slot.ChannelID, &slot.ScheduledAt, &slot.SlotType, &slot.CampaignID, &slot.Status); err != nil {
+		return domain.AdSlot{}, fmt.Errorf("create ad slot: %w", err)
+	}
+	return slot, nil
+}
+
+func (r *AdSlotRepository) ListByChannel(ctx context.Context, channelID int64, limit int) ([]domain.AdSlot, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if channelID <= 0 {
+		return nil, fmt.Errorf("channel id must be greater than zero")
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, channel_id, scheduled_at, slot_type, campaign_id, status
+		FROM ad_slots
+		WHERE channel_id = $1
+		ORDER BY scheduled_at ASC, id ASC
+		LIMIT $2`
+	rows, err := r.db.QueryContext(ctx, q, channelID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list ad slots by channel: %w", err)
+	}
+	defer rows.Close()
+
+	slots := make([]domain.AdSlot, 0)
+	for rows.Next() {
+		var slot domain.AdSlot
+		if err := rows.Scan(&slot.ID, &slot.ChannelID, &slot.ScheduledAt, &slot.SlotType, &slot.CampaignID, &slot.Status); err != nil {
+			return nil, fmt.Errorf("scan ad slot: %w", err)
+		}
+		slots = append(slots, slot)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate ad slots: %w", err)
+	}
+	return slots, nil
 }
 
 func (r *ClusterEventRepository) Create(ctx context.Context, event domain.ClusterEvent) (domain.ClusterEvent, error) {

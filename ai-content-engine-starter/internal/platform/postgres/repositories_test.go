@@ -21,6 +21,9 @@ func TestRepositoriesImplementDomainInterfaces(t *testing.T) {
 	var _ domain.AssetRelationshipRepository = (*AssetRelationshipRepository)(nil)
 	var _ domain.StoryClusterRepository = (*StoryClusterRepository)(nil)
 	var _ domain.MonetizationHookRepository = (*MonetizationHookRepository)(nil)
+	var _ domain.SponsorRepository = (*SponsorRepository)(nil)
+	var _ domain.AdCampaignRepository = (*AdCampaignRepository)(nil)
+	var _ domain.AdSlotRepository = (*AdSlotRepository)(nil)
 	var _ domain.ClusterEventRepository = (*ClusterEventRepository)(nil)
 	var _ domain.TopicMemoryRepository = (*TopicMemoryRepository)(nil)
 	var _ domain.ContentRuleRepository = (*ContentRuleRepository)(nil)
@@ -46,6 +49,97 @@ func TestPublishIntentRepositoryRejectsInvalidInput(t *testing.T) {
 	}
 	if err := repo.UpdateStatus(context.Background(), 1, "invalid"); err == nil {
 		t.Fatalf("UpdateStatus expected status validation error")
+	}
+}
+
+func TestSponsorRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewSponsorRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.Sponsor{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.Sponsor{Name: "ACME", Status: "invalid", ContactInfo: "sales@acme.test"}); err == nil {
+		t.Fatalf("Create expected status validation error")
+	}
+	if _, err := repo.GetByID(context.Background(), 0); err == nil {
+		t.Fatalf("GetByID expected id validation error")
+	}
+	if _, err := repo.List(context.Background(), 0); err == nil {
+		t.Fatalf("List expected limit validation error")
+	}
+}
+
+func TestAdCampaignRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewAdCampaignRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.AdCampaign{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	start := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC)
+	if _, err := repo.Create(context.Background(), domain.AdCampaign{
+		SponsorID:    1,
+		CampaignName: "Launch",
+		CampaignType: "invalid",
+		Status:       domain.AdCampaignStatusDraft,
+		StartAt:      start,
+		EndAt:        start.Add(time.Hour),
+	}); err == nil {
+		t.Fatalf("Create expected campaign type validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.AdCampaign{
+		SponsorID:    1,
+		CampaignName: "Launch",
+		CampaignType: domain.AdCampaignTypeSponsoredPost,
+		Status:       "invalid",
+		StartAt:      start,
+		EndAt:        start.Add(time.Hour),
+	}); err == nil {
+		t.Fatalf("Create expected campaign status validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.AdCampaign{
+		SponsorID:    1,
+		CampaignName: "Launch",
+		CampaignType: domain.AdCampaignTypeSponsoredPost,
+		Status:       domain.AdCampaignStatusDraft,
+		StartAt:      start.Add(time.Hour),
+		EndAt:        start,
+	}); err == nil {
+		t.Fatalf("Create expected time ordering validation error")
+	}
+	if _, err := repo.GetByID(context.Background(), 0); err == nil {
+		t.Fatalf("GetByID expected id validation error")
+	}
+	if _, err := repo.List(context.Background(), 0); err == nil {
+		t.Fatalf("List expected limit validation error")
+	}
+}
+
+func TestAdSlotRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewAdSlotRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.AdSlot{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.AdSlot{
+		ChannelID:   1,
+		ScheduledAt: time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC),
+		SlotType:    "invalid",
+		CampaignID:  1,
+		Status:      domain.AdSlotStatusScheduled,
+	}); err == nil {
+		t.Fatalf("Create expected slot type validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.AdSlot{
+		ChannelID:   1,
+		ScheduledAt: time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC),
+		SlotType:    domain.AdSlotTypeSponsoredPost,
+		CampaignID:  1,
+		Status:      "invalid",
+	}); err == nil {
+		t.Fatalf("Create expected slot status validation error")
+	}
+	if _, err := repo.ListByChannel(context.Background(), 0, 10); err == nil {
+		t.Fatalf("ListByChannel expected channel validation error")
+	}
+	if _, err := repo.ListByChannel(context.Background(), 1, 0); err == nil {
+		t.Fatalf("ListByChannel expected limit validation error")
 	}
 }
 

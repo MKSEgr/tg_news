@@ -79,6 +79,26 @@ type MonetizationHookRepository interface {
 	ListByDraftID(ctx context.Context, draftID int64, limit int) ([]MonetizationHook, error)
 }
 
+// SponsorRepository defines persistence operations for sponsors.
+type SponsorRepository interface {
+	Create(ctx context.Context, sponsor Sponsor) (Sponsor, error)
+	GetByID(ctx context.Context, id int64) (Sponsor, error)
+	List(ctx context.Context, limit int) ([]Sponsor, error)
+}
+
+// AdCampaignRepository defines persistence operations for sponsor-linked campaigns.
+type AdCampaignRepository interface {
+	Create(ctx context.Context, campaign AdCampaign) (AdCampaign, error)
+	GetByID(ctx context.Context, id int64) (AdCampaign, error)
+	List(ctx context.Context, limit int) ([]AdCampaign, error)
+}
+
+// AdSlotRepository defines persistence operations for explicit per-channel ad scheduling.
+type AdSlotRepository interface {
+	Create(ctx context.Context, slot AdSlot) (AdSlot, error)
+	ListByChannel(ctx context.Context, channelID int64, limit int) ([]AdSlot, error)
+}
+
 // ClusterEventRepository defines persistence operations for append-only cluster events.
 type ClusterEventRepository interface {
 	Create(ctx context.Context, event ClusterEvent) (ClusterEvent, error)
