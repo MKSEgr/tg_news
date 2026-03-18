@@ -63,3 +63,5 @@
 - V2-018 refinement: expanded rollout documentation with phase-based validation/rollback plan, full feature-flag matrix, and rollout-focused cleanup plan tied to architecture review findings.
 - V3-001 completed: added minimal editorial planner module, publish_intents domain/repository/migration, and optional orchestration hook to create one deterministic publish intent per item using scorer+router.
 - V3-002 completed: formalized publish intent statuses/semantics, added publish_intents status+uniqueness constraints, strengthened planner idempotency for raw item + channel, and added repository/status validation tests.
+- V3-004 completed: added minimal content_assets schema migration, domain/repository contracts, PostgreSQL repository methods (create/get/list), and focused repository+migration tests without pipeline integration.
+

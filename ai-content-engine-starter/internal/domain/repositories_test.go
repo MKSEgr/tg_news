@@ -41,6 +41,18 @@ func (stubDraftRepo) ListByStatus(context.Context, DraftStatus, int) ([]Draft, e
 }
 func (stubDraftRepo) UpdateStatus(context.Context, int64, DraftStatus) error { return nil }
 
+type stubContentAssetRepo struct{}
+
+func (stubContentAssetRepo) Create(context.Context, ContentAsset) (ContentAsset, error) {
+	return ContentAsset{}, nil
+}
+func (stubContentAssetRepo) GetByID(context.Context, int64) (ContentAsset, error) {
+	return ContentAsset{}, nil
+}
+func (stubContentAssetRepo) ListByRawItemID(context.Context, int64, int) ([]ContentAsset, error) {
+	return nil, nil
+}
+
 type stubTopicMemoryRepo struct{}
 
 func (stubTopicMemoryRepo) UpsertMention(context.Context, TopicMemory) (TopicMemory, error) {
@@ -89,6 +101,7 @@ func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ ContentRuleRepository = stubContentRuleRepo{}
 	var _ PerformanceFeedbackRepository = stubPerformanceFeedbackRepo{}
 	var _ PublishIntentRepository = stubPublishIntentRepo{}
+	var _ ContentAssetRepository = stubContentAssetRepo{}
 }
 
 func TestErrNotFoundIsWrappable(t *testing.T) {

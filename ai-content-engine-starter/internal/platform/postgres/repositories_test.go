@@ -15,6 +15,7 @@ func TestRepositoriesImplementDomainInterfaces(t *testing.T) {
 	var _ domain.SourceItemRepository = (*SourceItemRepository)(nil)
 	var _ domain.DraftRepository = (*DraftRepository)(nil)
 	var _ domain.PublishIntentRepository = (*PublishIntentRepository)(nil)
+	var _ domain.ContentAssetRepository = (*ContentAssetRepository)(nil)
 	var _ domain.TopicMemoryRepository = (*TopicMemoryRepository)(nil)
 	var _ domain.ContentRuleRepository = (*ContentRuleRepository)(nil)
 	var _ domain.PerformanceFeedbackRepository = (*PerformanceFeedbackRepository)(nil)
@@ -136,5 +137,24 @@ func TestNormalizeFeedbackVariant(t *testing.T) {
 				t.Fatalf("normalizeFeedbackVariant(%q) = %q, want %q", tc.in, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestContentAssetRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewContentAssetRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.ContentAsset{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ContentAsset{RawItemID: 1, ChannelID: 1, AssetType: "text", Status: "invalid"}); err == nil {
+		t.Fatalf("Create expected status validation error")
+	}
+	if _, err := repo.GetByID(context.Background(), 0); err == nil {
+		t.Fatalf("GetByID expected id validation error")
+	}
+	if _, err := repo.ListByRawItemID(context.Background(), 0, 10); err == nil {
+		t.Fatalf("ListByRawItemID expected raw item id validation error")
+	}
+	if _, err := repo.ListByRawItemID(context.Background(), 1, 0); err == nil {
+		t.Fatalf("ListByRawItemID expected limit validation error")
 	}
 }

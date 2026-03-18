@@ -36,6 +36,11 @@ type PublishIntentRepository struct {
 	db *sql.DB
 }
 
+// ContentAssetRepository is a PostgreSQL implementation of domain.ContentAssetRepository.
+type ContentAssetRepository struct {
+	db *sql.DB
+}
+
 // TopicMemoryRepository is a PostgreSQL implementation of domain.TopicMemoryRepository.
 type TopicMemoryRepository struct {
 	db *sql.DB
@@ -57,6 +62,9 @@ func NewSourceItemRepository(db *sql.DB) *SourceItemRepository { return &SourceI
 func NewDraftRepository(db *sql.DB) *DraftRepository           { return &DraftRepository{db: db} }
 func NewPublishIntentRepository(db *sql.DB) *PublishIntentRepository {
 	return &PublishIntentRepository{db: db}
+}
+func NewContentAssetRepository(db *sql.DB) *ContentAssetRepository {
+	return &ContentAssetRepository{db: db}
 }
 func NewTopicMemoryRepository(db *sql.DB) *TopicMemoryRepository {
 	return &TopicMemoryRepository{db: db}
@@ -711,4 +719,93 @@ func scanSourceItem(scanner sourceItemScanner, item *domain.SourceItem) error {
 	}
 
 	return nil
+}
+
+func (r *ContentAssetRepository) Create(ctx context.Context, asset domain.ContentAsset) (domain.ContentAsset, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.ContentAsset{}, err
+	}
+	if asset.RawItemID <= 0 {
+		return domain.ContentAsset{}, fmt.Errorf("raw item id must be greater than zero")
+	}
+	if asset.ChannelID <= 0 {
+		return domain.ContentAsset{}, fmt.Errorf("channel id must be greater than zero")
+	}
+	asset.AssetType = strings.ToLower(strings.TrimSpace(asset.AssetType))
+	if asset.AssetType == "" {
+		return domain.ContentAsset{}, fmt.Errorf("asset type is empty")
+	}
+	asset.Status = domain.ContentAssetStatus(strings.TrimSpace(string(asset.Status)))
+	if asset.Status == "" {
+		asset.Status = domain.ContentAssetStatusPending
+	}
+	if asset.Status != domain.ContentAssetStatusPending {
+		return domain.ContentAsset{}, fmt.Errorf("asset status is invalid")
+	}
+
+	const q = `INSERT INTO content_assets (raw_item_id, channel_id, asset_type, title, body, status)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, raw_item_id, channel_id, asset_type, title, body, status, created_at, updated_at`
+	row := r.db.QueryRowContext(ctx, q, asset.RawItemID, asset.ChannelID, asset.AssetType, asset.Title, asset.Body, asset.Status)
+	if err := row.Scan(&asset.ID, &asset.RawItemID, &asset.ChannelID, &asset.AssetType, &asset.Title, &asset.Body, &asset.Status, &asset.CreatedAt, &asset.UpdatedAt); err != nil {
+		return domain.ContentAsset{}, fmt.Errorf("create content asset: %w", err)
+	}
+	return asset, nil
+}
+
+func (r *ContentAssetRepository) GetByID(ctx context.Context, id int64) (domain.ContentAsset, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.ContentAsset{}, err
+	}
+	if id <= 0 {
+		return domain.ContentAsset{}, fmt.Errorf("content asset id must be greater than zero")
+	}
+
+	const q = `SELECT id, raw_item_id, channel_id, asset_type, title, body, status, created_at, updated_at
+		FROM content_assets WHERE id = $1`
+	var asset domain.ContentAsset
+	row := r.db.QueryRowContext(ctx, q, id)
+	if err := row.Scan(&asset.ID, &asset.RawItemID, &asset.ChannelID, &asset.AssetType, &asset.Title, &asset.Body, &asset.Status, &asset.CreatedAt, &asset.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ContentAsset{}, domain.ErrNotFound
+		}
+		return domain.ContentAsset{}, fmt.Errorf("get content asset by id: %w", err)
+	}
+	return asset, nil
+}
+
+func (r *ContentAssetRepository) ListByRawItemID(ctx context.Context, rawItemID int64, limit int) ([]domain.ContentAsset, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if rawItemID <= 0 {
+		return nil, fmt.Errorf("raw item id must be greater than zero")
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, raw_item_id, channel_id, asset_type, title, body, status, created_at, updated_at
+		FROM content_assets
+		WHERE raw_item_id = $1
+		ORDER BY id DESC
+		LIMIT $2`
+	rows, err := r.db.QueryContext(ctx, q, rawItemID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list content assets by raw item id: %w", err)
+	}
+	defer rows.Close()
+
+	assets := make([]domain.ContentAsset, 0)
+	for rows.Next() {
+		var asset domain.ContentAsset
+		if err := rows.Scan(&asset.ID, &asset.RawItemID, &asset.ChannelID, &asset.AssetType, &asset.Title, &asset.Body, &asset.Status, &asset.CreatedAt, &asset.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan content asset: %w", err)
+		}
+		assets = append(assets, asset)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate content assets: %w", err)
+	}
+	return assets, nil
 }

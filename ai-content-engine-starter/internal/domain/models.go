@@ -87,6 +87,26 @@ type PublishIntent struct {
 	CreatedAt time.Time
 }
 
+// ContentAssetStatus defines lifecycle state for generated content assets.
+type ContentAssetStatus string
+
+const (
+	ContentAssetStatusPending ContentAssetStatus = "pending"
+)
+
+// ContentAsset stores per-item, per-channel generated assets for future content packaging.
+type ContentAsset struct {
+	ID        int64
+	RawItemID int64
+	ChannelID int64
+	AssetType string
+	Title     string
+	Body      string
+	Status    ContentAssetStatus
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // TopicMemory stores deterministic per-channel topic frequency memory.
 type TopicMemory struct {
 	ID           int64

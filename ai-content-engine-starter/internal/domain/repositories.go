@@ -45,6 +45,13 @@ type PublishIntentRepository interface {
 	UpdateStatus(ctx context.Context, id int64, status PublishIntentStatus) error
 }
 
+// ContentAssetRepository defines persistence operations for content assets.
+type ContentAssetRepository interface {
+	Create(ctx context.Context, asset ContentAsset) (ContentAsset, error)
+	GetByID(ctx context.Context, id int64) (ContentAsset, error)
+	ListByRawItemID(ctx context.Context, rawItemID int64, limit int) ([]ContentAsset, error)
+}
+
 // TopicMemoryRepository defines persistence operations for topic memory.
 type TopicMemoryRepository interface {
 	UpsertMention(ctx context.Context, memory TopicMemory) (TopicMemory, error)

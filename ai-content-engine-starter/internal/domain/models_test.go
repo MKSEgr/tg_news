@@ -39,3 +39,9 @@ func TestPerformanceFeedbackDefaults(t *testing.T) {
 		t.Fatalf("PerformanceFeedback.Score = %f, want 0", feedback.Score)
 	}
 }
+
+func TestContentAssetStatusIsStable(t *testing.T) {
+	if ContentAssetStatusPending != "pending" {
+		t.Fatalf("ContentAssetStatusPending = %q, want %q", ContentAssetStatusPending, "pending")
+	}
+}
