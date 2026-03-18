@@ -233,6 +233,21 @@ func (p *plannerStub) PlanForSourceItem(context.Context, domain.SourceItem) ([]d
 	return nil, nil
 }
 
+type assetGeneratorStub struct {
+	calls   int
+	intents []domain.PublishIntent
+	err     error
+}
+
+func (g *assetGeneratorStub) GenerateFromIntent(_ context.Context, intent domain.PublishIntent) (domain.ContentAsset, error) {
+	g.calls++
+	g.intents = append(g.intents, intent)
+	if g.err != nil {
+		return domain.ContentAsset{}, g.err
+	}
+	return domain.ContentAsset{RawItemID: intent.RawItemID, ChannelID: intent.ChannelID, AssetType: intent.Format}, nil
+}
+
 type rulesStub struct {
 	allowByChannel map[int64]bool
 	err            error
@@ -382,6 +397,82 @@ func TestPipelineJobRunIgnoresPlannerError(t *testing.T) {
 	if len(drafts.created) != 1 {
 		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
 	}
+}
+
+func TestPipelineJobRunGeneratesAssetsFromPlannedIntents(t *testing.T) {
+	plannerCalls := 0
+	assetGen := &assetGeneratorStub{}
+	plannerResult := []domain.PublishIntent{{RawItemID: 10, ChannelID: 1, Format: "text", Status: domain.PublishIntentStatusPlanned}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{{ID: 1, Enabled: true}}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {{ID: 10, URL: "https://example.com/a", Title: "AI update"}}}},
+		&channelRepoStub{channels: []domain.Channel{{ID: 1, Slug: "ai-news"}}},
+		&draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}},
+		&normalizerStub{item: domain.SourceItem{ID: 10, URL: "https://example.com/a", Title: "AI update"}},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 5},
+		&routerStub{ids: []int64{1}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 10, ChannelID: 1, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job = job.WithEditorialPlanner(plannerFunc(func(context.Context, domain.SourceItem) ([]domain.PublishIntent, error) {
+		plannerCalls++
+		return plannerResult, nil
+	})).WithIntentAssetGenerator(assetGen)
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if plannerCalls != 1 {
+		t.Fatalf("planner calls = %d, want 1", plannerCalls)
+	}
+	if assetGen.calls != 1 {
+		t.Fatalf("assetGen calls = %d, want 1", assetGen.calls)
+	}
+}
+
+func TestPipelineJobRunIgnoresAssetGenerationError(t *testing.T) {
+	assetGen := &assetGeneratorStub{err: errors.New("asset gen failed")}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{{ID: 1, Enabled: true}}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {{ID: 10, URL: "https://example.com/a", Title: "AI update"}}}},
+		&channelRepoStub{channels: []domain.Channel{{ID: 1, Slug: "ai-news"}}},
+		&draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}},
+		&normalizerStub{item: domain.SourceItem{ID: 10, URL: "https://example.com/a", Title: "AI update"}},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 5},
+		&routerStub{ids: []int64{1}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 10, ChannelID: 1, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job = job.WithEditorialPlanner(plannerFunc(func(context.Context, domain.SourceItem) ([]domain.PublishIntent, error) {
+		return []domain.PublishIntent{{RawItemID: 10, ChannelID: 1, Format: "text", Status: domain.PublishIntentStatusPlanned}}, nil
+	})).WithIntentAssetGenerator(assetGen)
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if assetGen.calls != 1 {
+		t.Fatalf("assetGen calls = %d, want 1", assetGen.calls)
+	}
+}
+
+type plannerFunc func(context.Context, domain.SourceItem) ([]domain.PublishIntent, error)
+
+func (f plannerFunc) PlanForSourceItem(ctx context.Context, item domain.SourceItem) ([]domain.PublishIntent, error) {
+	return f(ctx, item)
 }
 
 func TestPipelineJobRunAppliesImageEnrichment(t *testing.T) {

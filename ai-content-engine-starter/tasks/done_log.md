@@ -65,4 +65,5 @@
 - V3-002 completed: formalized publish intent statuses/semantics, added publish_intents status+uniqueness constraints, strengthened planner idempotency for raw item + channel, and added repository/status validation tests.
 - V3-004 completed: added minimal content_assets schema migration, domain/repository contracts, PostgreSQL repository methods (create/get/list), and focused repository+migration tests without pipeline integration.
 - V3-005 completed: added minimal asset_relationships schema, relationship types (derived_from/followup_to), repository contract + postgres create/list methods, and focused migration/repository validation tests without traversal logic.
+- V3-006 completed: added a minimal asset generation service that maps publish_intents to 1:1 content_assets using source-item content, optional non-blocking orchestration invocation, and focused mapping/duplicate/integration tests.
 

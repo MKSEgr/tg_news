@@ -43,6 +43,7 @@ type PipelineJob struct {
 	rules              contentRuleEvaluator
 	feedback           feedbackReader
 	planner            editorialPlanner
+	assetGenerator     intentAssetGenerator
 	recentItemsLimit   int
 	existingDraftLimit int
 }
@@ -131,6 +132,10 @@ type memoryAwareGuard interface {
 
 type editorialPlanner interface {
 	PlanForSourceItem(ctx context.Context, item domain.SourceItem) ([]domain.PublishIntent, error)
+}
+
+type intentAssetGenerator interface {
+	GenerateFromIntent(ctx context.Context, intent domain.PublishIntent) (domain.ContentAsset, error)
 }
 
 // NewCollectorJob creates a collection job.
@@ -338,6 +343,15 @@ func (j *PipelineJob) WithEditorialPlanner(planner editorialPlanner) *PipelineJo
 	return j
 }
 
+// WithIntentAssetGenerator sets optional publish-intent to asset generation.
+func (j *PipelineJob) WithIntentAssetGenerator(generator intentAssetGenerator) *PipelineJob {
+	if j == nil {
+		return nil
+	}
+	j.assetGenerator = generator
+	return j
+}
+
 // Run executes one orchestration cycle.
 func (j *PipelineJob) Run(ctx context.Context) error {
 	if j == nil {
@@ -387,7 +401,12 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 
 		for _, item := range items {
 			if j.planner != nil {
-				_, _ = j.planner.PlanForSourceItem(ctx, item)
+				intents, _ := j.planner.PlanForSourceItem(ctx, item)
+				if j.assetGenerator != nil {
+					for _, intent := range intents {
+						_, _ = j.assetGenerator.GenerateFromIntent(ctx, intent)
+					}
+				}
 			}
 
 			normalized, err := j.normalizer.Normalize(item)
