@@ -144,3 +144,31 @@ func containsAny(text string, keywords []string) bool {
 	}
 	return false
 }
+
+// RouteWithCluster adds optional cluster context as a soft hint without overriding base routing decisions.
+func (s *Service) RouteWithCluster(item domain.SourceItem, channels []domain.Channel, cluster domain.StoryCluster) ([]int64, error) {
+	base, err := s.Route(item, channels)
+	if err != nil {
+		return nil, err
+	}
+	if cluster.ID <= 0 {
+		return base, nil
+	}
+	hintItem := domain.SourceItem{Title: strings.TrimSpace(cluster.Title)}
+	if summary := strings.TrimSpace(cluster.Summary); summary != "" {
+		hintItem.Body = &summary
+	}
+	hintIDs, err := s.Route(hintItem, channels)
+	if err != nil {
+		return base, nil
+	}
+	return mergeSoftHintRouteIDs(base, hintIDs), nil
+}
+
+func mergeSoftHintRouteIDs(base []int64, hints []int64) []int64 {
+	out := append([]int64(nil), base...)
+	for _, id := range hints {
+		out = appendUnique(out, id)
+	}
+	return out
+}

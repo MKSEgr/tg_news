@@ -120,6 +120,27 @@ func TestGenerateDraftWithFeedbackAddsPromptHint(t *testing.T) {
 	}
 }
 
+func TestGenerateDraftWithClusterAddsPromptContext(t *testing.T) {
+	ai := &fakeAIClient{response: "Готовый текст поста"}
+	svc, err := New(ai)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	_, err = svc.GenerateDraftWithCluster(
+		context.Background(),
+		domain.SourceItem{ID: 11, Title: "AI release", URL: "https://example.com"},
+		domain.Channel{ID: 7, Name: "AI News", Slug: "ai-news"},
+		domain.StoryCluster{ID: 99, Title: "OpenAI launches", Summary: "Release cluster"},
+	)
+	if err != nil {
+		t.Fatalf("GenerateDraftWithCluster() error = %v", err)
+	}
+	if !strings.Contains(ai.lastPrompt, "Контекст кластера: id=99") {
+		t.Fatalf("prompt = %q", ai.lastPrompt)
+	}
+}
+
 func TestGenerateDraftVariantsHappyPath(t *testing.T) {
 	ai := &fakeAIClient{response: "Готовый текст поста"}
 	svc, err := New(ai)

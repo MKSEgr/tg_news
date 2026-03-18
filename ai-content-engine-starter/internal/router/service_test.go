@@ -102,3 +102,19 @@ func TestRouteWithFeedbackOrdersByChannelFeedback(t *testing.T) {
 		t.Fatalf("ids = %v, want first channel with best feedback", ids)
 	}
 }
+
+func TestRouteWithClusterAddsOnlySoftHints(t *testing.T) {
+	svc := New()
+	channels := testChannels()
+	ids, err := svc.RouteWithCluster(
+		domain.SourceItem{Title: "Weekly update"},
+		channels,
+		domain.StoryCluster{ID: 5, Title: "Tool launch automation workflow"},
+	)
+	if err != nil {
+		t.Fatalf("RouteWithCluster() error = %v", err)
+	}
+	if len(ids) < 3 || ids[0] != 1 {
+		t.Fatalf("ids = %v, want base route preserved with hinted additions", ids)
+	}
+}

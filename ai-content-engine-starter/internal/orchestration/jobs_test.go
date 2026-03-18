@@ -234,6 +234,66 @@ func (g *feedbackGeneratorStub) GenerateDraftWithFeedback(context.Context, domai
 	return g.draftFeedback, nil
 }
 
+type clusterObserverStub struct {
+	cluster domain.StoryCluster
+	err     error
+	calls   int
+}
+
+func (s *clusterObserverStub) ObserveSignal(context.Context, domain.SourceItem) (domain.StoryCluster, domain.ClusterEvent, error) {
+	s.calls++
+	if s.err != nil {
+		return domain.StoryCluster{}, domain.ClusterEvent{}, s.err
+	}
+	return s.cluster, domain.ClusterEvent{StoryClusterID: s.cluster.ID}, nil
+}
+
+type clusterAwareRouterStub struct {
+	baseIDs    []int64
+	clusterIDs []int64
+	calls      int
+}
+
+func (r *clusterAwareRouterStub) Route(domain.SourceItem, []domain.Channel) ([]int64, error) {
+	return r.baseIDs, nil
+}
+func (r *clusterAwareRouterStub) RouteWithCluster(domain.SourceItem, []domain.Channel, domain.StoryCluster) ([]int64, error) {
+	r.calls++
+	return r.clusterIDs, nil
+}
+
+type clusterAwareGeneratorStub struct {
+	draft domain.Draft
+	calls int
+}
+
+func (g *clusterAwareGeneratorStub) GenerateDraft(context.Context, domain.SourceItem, domain.Channel) (domain.Draft, error) {
+	return domain.Draft{}, errors.New("base path should not be used")
+}
+func (g *clusterAwareGeneratorStub) GenerateDraftWithCluster(_ context.Context, item domain.SourceItem, channel domain.Channel, _ domain.StoryCluster) (domain.Draft, error) {
+	g.calls++
+	draft := g.draft
+	draft.SourceItemID = item.ID
+	draft.ChannelID = channel.ID
+	return draft, nil
+}
+
+type clusterAwareVariantGeneratorStub struct {
+	calls int
+}
+
+func (g *clusterAwareVariantGeneratorStub) GenerateDraft(context.Context, domain.SourceItem, domain.Channel) (domain.Draft, error) {
+	return domain.Draft{}, errors.New("base path should not be used")
+}
+
+func (g *clusterAwareVariantGeneratorStub) GenerateDraftVariantsWithCluster(_ context.Context, item domain.SourceItem, channel domain.Channel, _ float64, _ domain.StoryCluster) ([]domain.Draft, error) {
+	g.calls++
+	return []domain.Draft{
+		{SourceItemID: item.ID, ChannelID: channel.ID, Variant: "A", Title: "a", Body: "body", Status: domain.DraftStatusPending},
+		{SourceItemID: item.ID, ChannelID: channel.ID, Variant: "B", Title: "b", Body: "body", Status: domain.DraftStatusPending},
+	}, nil
+}
+
 type guardStub struct{ result editorial.Result }
 
 func (g *guardStub) Check(domain.Draft) (editorial.Result, error) { return g.result, nil }
@@ -320,6 +380,161 @@ func TestCollectorJobRun(t *testing.T) {
 	}
 	if err := job.Run(context.Background()); err != nil {
 		t.Fatalf("Run() error = %v", err)
+	}
+}
+
+func TestPipelineJobRunClusterHintsCanAddAdditionalChannels(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "Weekly update"}
+	channels := []domain.Channel{{ID: 1, Slug: "ai-news", Name: "AI News"}, {ID: 2, Slug: "ai-tools", Name: "AI Tools"}}
+	observer := &clusterObserverStub{cluster: domain.StoryCluster{ID: 77, Title: "Tool launch"}}
+	router := &clusterAwareRouterStub{baseIDs: []int64{1}, clusterIDs: []int64{1, 2}}
+	gen := &clusterAwareGeneratorStub{draft: domain.Draft{Title: "t", Body: "b", Status: domain.DraftStatusPending}}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: channels},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		router,
+		gen,
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job.WithStoryClusterObserver(observer)
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.created) != 2 {
+		t.Fatalf("created drafts = %d, want 2", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunSkipsClusterAwareVariantGenerationWhenVariantsExist(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "Weekly update"}
+	channel := domain.Channel{ID: 1, Slug: "ai-news", Name: "AI News"}
+	observer := &clusterObserverStub{cluster: domain.StoryCluster{ID: 77, Title: "Tool launch"}}
+	gen := &clusterAwareVariantGeneratorStub{}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{
+		domain.DraftStatusPending: {
+			{SourceItemID: 11, ChannelID: 1, Variant: "A", Status: domain.DraftStatusPending},
+			{SourceItemID: 11, ChannelID: 1, Variant: "B", Status: domain.DraftStatusPending},
+		},
+	}}
+
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{1}},
+		gen,
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job.WithStoryClusterObserver(observer)
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if gen.calls != 0 {
+		t.Fatalf("generator calls = %d, want 0", gen.calls)
+	}
+}
+
+func TestPipelineJobRunUsesOptionalClusterContextForRoutingAndGeneration(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "Weekly update"}
+	channels := []domain.Channel{{ID: 1, Slug: "ai-news", Name: "AI News"}}
+	observer := &clusterObserverStub{cluster: domain.StoryCluster{ID: 77, Title: "Tool launch"}}
+	router := &clusterAwareRouterStub{baseIDs: []int64{1}, clusterIDs: []int64{1}}
+	gen := &clusterAwareGeneratorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 1, Title: "t", Body: "b", Status: domain.DraftStatusPending}}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: channels},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		router,
+		gen,
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job.WithStoryClusterObserver(observer)
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if observer.calls != 1 {
+		t.Fatalf("observer calls = %d, want 1", observer.calls)
+	}
+	if router.calls != 1 {
+		t.Fatalf("router calls = %d, want 1", router.calls)
+	}
+	if gen.calls != 1 {
+		t.Fatalf("generator calls = %d, want 1", gen.calls)
+	}
+}
+
+func TestPipelineJobRunIgnoresOptionalClusterObserverError(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job.WithStoryClusterObserver(&clusterObserverStub{err: errors.New("cluster unavailable")})
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.created) != 1 {
+		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
 	}
 }
 

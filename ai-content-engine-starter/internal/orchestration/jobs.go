@@ -44,6 +44,7 @@ type PipelineJob struct {
 	feedback           feedbackReader
 	planner            editorialPlanner
 	assetGenerator     intentAssetGenerator
+	clusterObserver    storyClusterObserver
 	recentItemsLimit   int
 	existingDraftLimit int
 }
@@ -136,6 +137,26 @@ type editorialPlanner interface {
 
 type intentAssetGenerator interface {
 	GenerateFromIntent(ctx context.Context, intent domain.PublishIntent) (domain.ContentAsset, error)
+}
+
+type storyClusterObserver interface {
+	ObserveSignal(ctx context.Context, item domain.SourceItem) (domain.StoryCluster, domain.ClusterEvent, error)
+}
+
+type clusterAwareRouter interface {
+	RouteWithCluster(item domain.SourceItem, channels []domain.Channel, cluster domain.StoryCluster) ([]int64, error)
+}
+
+type clusterAwareGenerator interface {
+	GenerateDraftWithCluster(ctx context.Context, item domain.SourceItem, channel domain.Channel, cluster domain.StoryCluster) (domain.Draft, error)
+}
+
+type clusterAwareFeedbackGenerator interface {
+	GenerateDraftWithFeedbackAndCluster(ctx context.Context, item domain.SourceItem, channel domain.Channel, channelFeedback float64, cluster domain.StoryCluster) (domain.Draft, error)
+}
+
+type clusterAwareVariantGenerator interface {
+	GenerateDraftVariantsWithCluster(ctx context.Context, item domain.SourceItem, channel domain.Channel, channelFeedback float64, cluster domain.StoryCluster) ([]domain.Draft, error)
 }
 
 // NewCollectorJob creates a collection job.
@@ -352,6 +373,15 @@ func (j *PipelineJob) WithIntentAssetGenerator(generator intentAssetGenerator) *
 	return j
 }
 
+// WithStoryClusterObserver sets optional story cluster observation for routing/generation context.
+func (j *PipelineJob) WithStoryClusterObserver(observer storyClusterObserver) *PipelineJob {
+	if j == nil {
+		return nil
+	}
+	j.clusterObserver = observer
+	return j
+}
+
 // Run executes one orchestration cycle.
 func (j *PipelineJob) Run(ctx context.Context) error {
 	if j == nil {
@@ -430,9 +460,24 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				continue
 			}
 
+			cluster := domain.StoryCluster{}
+			if j.clusterObserver != nil {
+				observedCluster, _, observeErr := j.clusterObserver.ObserveSignal(ctx, normalized)
+				if observeErr == nil {
+					cluster = observedCluster
+				}
+			}
+
 			targetIDs, err := j.router.Route(normalized, channels)
 			if memoryRouter, ok := j.router.(memoryAwareRouter); ok {
 				targetIDs, err = memoryRouter.RouteWithMemory(normalized, channels, memoryByChannel)
+			}
+			if clusterRouter, ok := j.router.(clusterAwareRouter); ok && cluster.ID > 0 {
+				clusterIDs, clusterErr := clusterRouter.RouteWithCluster(normalized, channels, cluster)
+				if clusterErr != nil {
+					return fmt.Errorf("route item %d: %w", item.ID, clusterErr)
+				}
+				targetIDs = mergeRankedRouteIDs(targetIDs, clusterIDs)
 			}
 			if feedbackRouter, ok := j.router.(feedbackAwareRouter); ok {
 				feedbackIDs, feedbackErr := feedbackRouter.RouteWithFeedback(normalized, channels, feedbackByChannel)
@@ -483,7 +528,7 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 
 			for _, channelID := range allowedTargetIDs {
 				key := draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "A"}
-				if _, isVariantGenerator := j.generator.(variantAwareGenerator); isVariantGenerator {
+				if _, isVariantGenerator := j.generator.(variantAwareGenerator); isVariantGenerator || implementsClusterAwareVariants(j.generator) {
 					if _, hasA := existing[draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "A"}]; hasA {
 						if _, hasB := existing[draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "B"}]; hasB {
 							continue
@@ -504,15 +549,24 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				}
 
 				variants := make([]domain.Draft, 0, 2)
-				if variantGenerator, ok := j.generator.(variantAwareGenerator); ok {
+				if clusterVariantGenerator, ok := j.generator.(clusterAwareVariantGenerator); ok && cluster.ID > 0 {
+					variants, err = clusterVariantGenerator.GenerateDraftVariantsWithCluster(ctx, normalized, channel, feedbackByChannel[channelID], cluster)
+					if err != nil {
+						return fmt.Errorf("generate draft variants for item %d, channel %d: %w", normalized.ID, channelID, err)
+					}
+				} else if variantGenerator, ok := j.generator.(variantAwareGenerator); ok {
 					variants, err = variantGenerator.GenerateDraftVariants(ctx, normalized, channel, feedbackByChannel[channelID])
 					if err != nil {
 						return fmt.Errorf("generate draft variants for item %d, channel %d: %w", normalized.ID, channelID, err)
 					}
 				} else {
 					var draft domain.Draft
-					if feedbackGenerator, ok := j.generator.(feedbackAwareGenerator); ok {
+					if clusterFeedbackGenerator, ok := j.generator.(clusterAwareFeedbackGenerator); ok && cluster.ID > 0 {
+						draft, err = clusterFeedbackGenerator.GenerateDraftWithFeedbackAndCluster(ctx, normalized, channel, feedbackByChannel[channelID], cluster)
+					} else if feedbackGenerator, ok := j.generator.(feedbackAwareGenerator); ok {
 						draft, err = feedbackGenerator.GenerateDraftWithFeedback(ctx, normalized, channel, feedbackByChannel[channelID])
+					} else if clusterGenerator, ok := j.generator.(clusterAwareGenerator); ok && cluster.ID > 0 {
+						draft, err = clusterGenerator.GenerateDraftWithCluster(ctx, normalized, channel, cluster)
 					} else {
 						draft, err = j.generator.GenerateDraft(ctx, normalized, channel)
 					}
@@ -677,4 +731,12 @@ func (j *PipelineJob) existingDraftKeys(ctx context.Context) (map[draftKey]struc
 		}
 	}
 	return keys, nil
+}
+
+func implementsClusterAwareVariants(generator draftGenerator) bool {
+	if generator == nil {
+		return false
+	}
+	_, ok := generator.(clusterAwareVariantGenerator)
+	return ok
 }

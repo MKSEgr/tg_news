@@ -9,3 +9,4 @@
 - [x] V3-007 Implement story_clusters
 - [x] V3-008 Implement cluster events
 - [x] V3-009 Implement deterministic cluster detection
+- [x] V3-010 Integrate clusters into routing and generation
