@@ -123,6 +123,10 @@ type memoryAwareScorer interface {
 	ScoreWithMemory(item domain.SourceItem, memories []domain.TopicMemory) int
 }
 
+type adaptiveScorer interface {
+	ScoreAdaptive(ctx context.Context, item domain.SourceItem, channelID int64, format string) (int, error)
+}
+
 type memoryAwareRouter interface {
 	RouteWithMemory(item domain.SourceItem, channels []domain.Channel, memoryByChannel map[int64][]domain.TopicMemory) ([]int64, error)
 }
@@ -552,6 +556,13 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				channelScore := score
 				if hasMemoryScorer {
 					channelScore = score + (memoryScorer.ScoreWithMemory(normalized, memoryByChannel[channelID]) - baseScore)
+				}
+				if adaptive, ok := j.scorer.(adaptiveScorer); ok {
+					adaptiveScore, adaptiveErr := adaptive.ScoreAdaptive(ctx, normalized, channelID, "text")
+					if adaptiveErr != nil {
+						return fmt.Errorf("adaptive score item %d, channel %d: %w", normalized.ID, channelID, adaptiveErr)
+					}
+					channelScore = adaptiveScore
 				}
 				if channelScore <= 0 {
 					continue

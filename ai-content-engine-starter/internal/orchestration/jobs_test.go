@@ -146,6 +146,21 @@ type scorerStub struct{ score int }
 
 func (s *scorerStub) Score(domain.SourceItem) int { return s.score }
 
+type adaptiveScorerStub struct {
+	score int
+	err   error
+	calls int
+}
+
+func (s *adaptiveScorerStub) Score(domain.SourceItem) int { return 5 }
+func (s *adaptiveScorerStub) ScoreAdaptive(context.Context, domain.SourceItem, int64, string) (int, error) {
+	s.calls++
+	if s.err != nil {
+		return 0, s.err
+	}
+	return s.score, nil
+}
+
 type advancedScorerStub struct {
 	base     int
 	memory   int
@@ -627,6 +642,39 @@ func TestPipelineJobRunIgnoresOptionalClusterObserverError(t *testing.T) {
 
 	if err := job.Run(context.Background()); err != nil {
 		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.created) != 1 {
+		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunUsesAdaptiveScorePerChannel(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+	scorer := &adaptiveScorerStub{score: 12}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		scorer,
+		&routerStub{ids: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil, nil, nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if scorer.calls != 1 {
+		t.Fatalf("adaptive scorer calls = %d, want 1", scorer.calls)
 	}
 	if len(drafts.created) != 1 {
 		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
