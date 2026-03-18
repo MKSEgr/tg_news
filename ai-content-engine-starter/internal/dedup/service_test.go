@@ -13,6 +13,7 @@ type sourceItemRepoStub struct {
 	err        error
 	lastSource int64
 	lastLimit  int
+	listRecent bool
 }
 
 func (s *sourceItemRepoStub) Create(context.Context, domain.SourceItem) (domain.SourceItem, error) {
@@ -25,6 +26,15 @@ func (s *sourceItemRepoStub) GetByID(context.Context, int64) (domain.SourceItem,
 
 func (s *sourceItemRepoStub) ListBySourceID(_ context.Context, sourceID int64, limit int) ([]domain.SourceItem, error) {
 	s.lastSource = sourceID
+	s.lastLimit = limit
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.items, nil
+}
+
+func (s *sourceItemRepoStub) ListRecent(_ context.Context, limit int) ([]domain.SourceItem, error) {
+	s.listRecent = true
 	s.lastLimit = limit
 	if s.err != nil {
 		return nil, s.err
@@ -55,6 +65,9 @@ func TestIsDuplicateByExternalID(t *testing.T) {
 	if repo.lastLimit != 50 {
 		t.Fatalf("limit = %d, want 50", repo.lastLimit)
 	}
+	if !repo.listRecent {
+		t.Fatalf("expected ListRecent to be used")
+	}
 }
 
 func TestIsDuplicateByURLOrTitle(t *testing.T) {
@@ -81,6 +94,22 @@ func TestIsDuplicateByURLOrTitle(t *testing.T) {
 	}
 	if repo.lastLimit != defaultRecentLimit {
 		t.Fatalf("limit = %d, want default %d", repo.lastLimit, defaultRecentLimit)
+	}
+}
+
+func TestIsDuplicateAcrossDifferentSources(t *testing.T) {
+	repo := &sourceItemRepoStub{items: []domain.SourceItem{{SourceID: 2, URL: "https://example.com/shared"}}}
+	svc, err := New(repo, 10)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	dup, err := svc.IsDuplicate(context.Background(), domain.SourceItem{SourceID: 1, URL: "https://example.com/shared"})
+	if err != nil {
+		t.Fatalf("IsDuplicate() error = %v", err)
+	}
+	if !dup {
+		t.Fatalf("expected cross-source duplicate")
 	}
 }
 

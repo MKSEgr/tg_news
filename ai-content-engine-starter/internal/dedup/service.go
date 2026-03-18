@@ -49,7 +49,7 @@ func (s *Service) IsDuplicate(ctx context.Context, item domain.SourceItem) (bool
 		return false, fmt.Errorf("item must have at least one dedup key")
 	}
 
-	recent, err := s.repo.ListBySourceID(ctx, item.SourceID, s.limit)
+	recent, err := s.repo.ListRecent(ctx, s.limit)
 	if err != nil {
 		return false, fmt.Errorf("list source items: %w", err)
 	}

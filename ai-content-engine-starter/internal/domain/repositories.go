@@ -28,6 +28,7 @@ type SourceItemRepository interface {
 	Create(ctx context.Context, item SourceItem) (SourceItem, error)
 	GetByID(ctx context.Context, id int64) (SourceItem, error)
 	ListBySourceID(ctx context.Context, sourceID int64, limit int) ([]SourceItem, error)
+	ListRecent(ctx context.Context, limit int) ([]SourceItem, error)
 }
 
 // DraftRepository defines persistence operations for generated drafts.

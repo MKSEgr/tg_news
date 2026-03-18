@@ -69,3 +69,4 @@
 - V3-007 completed: added minimal story_clusters schema migration, domain/repository contracts, PostgreSQL repository create/get/find methods, and focused migration/repository validation tests without clustering logic or pipeline integration.
 - V3-003 completed: added minimal monetization_hooks schema, domain model/repository contracts, PostgreSQL repository create/get/list methods, and focused validation/migration tests without pipeline integration.
 - V3-008 completed: added append-only cluster_events schema, domain/repository contracts, PostgreSQL repository create/list methods, and focused migration/repository validation tests without planner or pipeline integration.
+- V3-009 completed: added a standalone deterministic story cluster detection service that derives stable cluster keys from source-item text, reuses or creates story_clusters, appends signal_added cluster_events, and includes focused unit tests without editorial planner integration.

@@ -400,15 +400,6 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 		}
 
 		for _, item := range items {
-			if j.planner != nil {
-				intents, _ := j.planner.PlanForSourceItem(ctx, item)
-				if j.assetGenerator != nil {
-					for _, intent := range intents {
-						_, _ = j.assetGenerator.GenerateFromIntent(ctx, intent)
-					}
-				}
-			}
-
 			normalized, err := j.normalizer.Normalize(item)
 			if err != nil {
 				continue
@@ -454,19 +445,8 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				return fmt.Errorf("route item %d: %w", item.ID, err)
 			}
 
+			allowedTargetIDs := make([]int64, 0, len(targetIDs))
 			for _, channelID := range targetIDs {
-				key := draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "A"}
-				if _, isVariantGenerator := j.generator.(variantAwareGenerator); isVariantGenerator {
-					if _, hasA := existing[draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "A"}]; hasA {
-						if _, hasB := existing[draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "B"}]; hasB {
-							continue
-						}
-					}
-				} else {
-					if _, ok := existing[key]; ok {
-						continue
-					}
-				}
 				channel, ok := channelByID[channelID]
 				if !ok {
 					continue
@@ -480,6 +460,41 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 						continue
 					}
 				}
+				allowedTargetIDs = append(allowedTargetIDs, channel.ID)
+			}
+			if len(allowedTargetIDs) == 0 {
+				continue
+			}
+			if j.planner != nil {
+				intents, _ := j.planner.PlanForSourceItem(ctx, normalized)
+				if j.assetGenerator != nil {
+					allowedIntentChannels := make(map[int64]struct{}, len(allowedTargetIDs))
+					for _, channelID := range allowedTargetIDs {
+						allowedIntentChannels[channelID] = struct{}{}
+					}
+					for _, intent := range intents {
+						if _, ok := allowedIntentChannels[intent.ChannelID]; !ok {
+							continue
+						}
+						_, _ = j.assetGenerator.GenerateFromIntent(ctx, intent)
+					}
+				}
+			}
+
+			for _, channelID := range allowedTargetIDs {
+				key := draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "A"}
+				if _, isVariantGenerator := j.generator.(variantAwareGenerator); isVariantGenerator {
+					if _, hasA := existing[draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "A"}]; hasA {
+						if _, hasB := existing[draftKey{SourceItemID: normalized.ID, ChannelID: channelID, Variant: "B"}]; hasB {
+							continue
+						}
+					}
+				} else {
+					if _, ok := existing[key]; ok {
+						continue
+					}
+				}
+				channel := channelByID[channelID]
 				channelScore := score
 				if hasMemoryScorer {
 					channelScore = score + (memoryScorer.ScoreWithMemory(normalized, memoryByChannel[channelID]) - baseScore)

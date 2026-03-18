@@ -31,6 +31,9 @@ func (stubSourceItemRepo) GetByID(context.Context, int64) (SourceItem, error) {
 func (stubSourceItemRepo) ListBySourceID(context.Context, int64, int) ([]SourceItem, error) {
 	return nil, nil
 }
+func (stubSourceItemRepo) ListRecent(context.Context, int) ([]SourceItem, error) {
+	return nil, nil
+}
 
 type stubDraftRepo struct{}
 

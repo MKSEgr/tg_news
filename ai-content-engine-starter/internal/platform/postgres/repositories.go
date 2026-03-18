@@ -321,6 +321,38 @@ func (r *SourceItemRepository) ListBySourceID(ctx context.Context, sourceID int6
 	return items, nil
 }
 
+func (r *SourceItemRepository) ListRecent(ctx context.Context, limit int) ([]domain.SourceItem, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, source_id, external_id, url, title, body, published_at, collected_at, created_at
+		FROM source_items
+		ORDER BY collected_at DESC, id DESC
+		LIMIT $1`
+	rows, err := r.db.QueryContext(ctx, q, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list recent source items: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]domain.SourceItem, 0)
+	for rows.Next() {
+		var item domain.SourceItem
+		if err := scanSourceItem(rows, &item); err != nil {
+			return nil, fmt.Errorf("scan source item: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate source items: %w", err)
+	}
+	return items, nil
+}
+
 func (r *DraftRepository) Create(ctx context.Context, draft domain.Draft) (domain.Draft, error) {
 	if err := ensureDB(r.db); err != nil {
 		return domain.Draft{}, err

@@ -25,6 +25,7 @@ func (r itemRepoStub) GetByID(context.Context, int64) (domain.SourceItem, error)
 func (r itemRepoStub) ListBySourceID(context.Context, int64, int) ([]domain.SourceItem, error) {
 	return nil, nil
 }
+func (r itemRepoStub) ListRecent(context.Context, int) ([]domain.SourceItem, error) { return nil, nil }
 
 type assetRepoStub struct {
 	created  []domain.ContentAsset

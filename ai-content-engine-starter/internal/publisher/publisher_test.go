@@ -93,6 +93,32 @@ func TestPublishDraftPhotoHappyPath(t *testing.T) {
 	}
 }
 
+func TestPublishDraftPhotoTruncatesLongCaption(t *testing.T) {
+	imageURL := "https://cdn.example.com/photo.jpg"
+	longBody := strings.Repeat("a", telegramPhotoCaptionLimit+200)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req sendPhotoRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if len(req.Caption) != telegramPhotoCaptionLimit {
+			t.Fatalf("caption len = %d, want %d", len(req.Caption), telegramPhotoCaptionLimit)
+		}
+		_, _ = w.Write([]byte(`{"ok":true,"result":{"message_id":44}}`))
+	}))
+	defer server.Close()
+
+	client, err := New(server.Client(), "token")
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	client.baseURL = server.URL
+
+	if _, err := client.PublishDraft(context.Background(), domain.Draft{ID: 1, Body: longBody, ImageURL: &imageURL, Status: domain.DraftStatusApproved}, "@ai_news"); err != nil {
+		t.Fatalf("PublishDraft() error = %v", err)
+	}
+}
+
 func TestPublishDraftValidationAndErrors(t *testing.T) {
 	if _, err := New(nil, ""); err == nil {
 		t.Fatalf("New() expected bot token error")

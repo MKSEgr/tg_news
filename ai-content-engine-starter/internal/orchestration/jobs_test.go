@@ -55,6 +55,16 @@ func (s *sourceItemRepoStub) ListBySourceID(_ context.Context, sourceID int64, _
 	}
 	return s.itemsBySource[sourceID], nil
 }
+func (s *sourceItemRepoStub) ListRecent(_ context.Context, _ int) ([]domain.SourceItem, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	items := make([]domain.SourceItem, 0)
+	for _, sourceItems := range s.itemsBySource {
+		items = append(items, sourceItems...)
+	}
+	return items, nil
+}
 
 type channelRepoStub struct {
 	channels []domain.Channel
@@ -420,6 +430,36 @@ func TestPipelineJobRunIgnoresPlannerError(t *testing.T) {
 	}
 }
 
+func TestPipelineJobRunDoesNotPlanDuplicateItems(t *testing.T) {
+	planner := &plannerStub{}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{{ID: 1, Enabled: true}}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {{ID: 10, URL: "https://example.com/a", Title: "AI update"}}}},
+		&channelRepoStub{channels: []domain.Channel{{ID: 1, Slug: "ai-news"}}},
+		&draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}},
+		&normalizerStub{item: domain.SourceItem{ID: 10, URL: "https://example.com/a", Title: "AI update"}},
+		&dedupStub{duplicate: true},
+		&scorerStub{score: 5},
+		&routerStub{ids: []int64{1}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 10, ChannelID: 1, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job = job.WithEditorialPlanner(planner)
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if planner.calls != 0 {
+		t.Fatalf("planner calls = %d, want 0", planner.calls)
+	}
+}
+
 func TestPipelineJobRunGeneratesAssetsFromPlannedIntents(t *testing.T) {
 	plannerCalls := 0
 	assetGen := &assetGeneratorStub{}
@@ -487,6 +527,43 @@ func TestPipelineJobRunIgnoresAssetGenerationError(t *testing.T) {
 	}
 	if assetGen.calls != 1 {
 		t.Fatalf("assetGen calls = %d, want 1", assetGen.calls)
+	}
+}
+
+func TestPipelineJobRunDoesNotPlanOrGenerateAssetsWhenRulesBlockAllChannels(t *testing.T) {
+	plannerCalls := 0
+	assetGen := &assetGeneratorStub{}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{{ID: 1, Enabled: true}}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {{ID: 10, URL: "https://example.com/a", Title: "AI update"}}}},
+		&channelRepoStub{channels: []domain.Channel{{ID: 1, Slug: "ai-news"}}},
+		&draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}},
+		&normalizerStub{item: domain.SourceItem{ID: 10, URL: "https://example.com/a", Title: "AI update"}},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 5},
+		&routerStub{ids: []int64{1}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 10, ChannelID: 1, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		&rulesStub{allowByChannel: map[int64]bool{1: false}},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job = job.WithEditorialPlanner(plannerFunc(func(context.Context, domain.SourceItem) ([]domain.PublishIntent, error) {
+		plannerCalls++
+		return []domain.PublishIntent{{RawItemID: 10, ChannelID: 1, Format: "text", Status: domain.PublishIntentStatusPlanned}}, nil
+	})).WithIntentAssetGenerator(assetGen)
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if plannerCalls != 0 {
+		t.Fatalf("planner calls = %d, want 0", plannerCalls)
+	}
+	if assetGen.calls != 0 {
+		t.Fatalf("assetGen calls = %d, want 0", assetGen.calls)
 	}
 }
 

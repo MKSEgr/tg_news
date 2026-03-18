@@ -55,6 +55,13 @@ func TestListBySourceIDRejectsInvalidLimit(t *testing.T) {
 	}
 }
 
+func TestListRecentRejectsInvalidLimit(t *testing.T) {
+	repo := NewSourceItemRepository(&sql.DB{})
+	if _, err := repo.ListRecent(context.Background(), 0); err == nil {
+		t.Fatalf("ListRecent expected error for invalid limit")
+	}
+}
+
 func TestListByStatusRejectsInvalidLimit(t *testing.T) {
 	repo := NewDraftRepository(&sql.DB{})
 	_, err := repo.ListByStatus(context.Background(), domain.DraftStatusPending, 0)

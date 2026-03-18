@@ -8,3 +8,4 @@
 - [x] V3-006 Implement asset generation pipeline
 - [x] V3-007 Implement story_clusters
 - [x] V3-008 Implement cluster events
+- [x] V3-009 Implement deterministic cluster detection

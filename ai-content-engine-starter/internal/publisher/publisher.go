@@ -14,6 +14,7 @@ import (
 )
 
 const telegramAPIBase = "https://api.telegram.org"
+const telegramPhotoCaptionLimit = 1024
 
 // Client publishes approved drafts to Telegram channels.
 type Client struct {
@@ -71,7 +72,7 @@ func (c *Client) PublishDraft(ctx context.Context, draft domain.Draft, chatID st
 		if !isHTTPURL(imageURL) {
 			return 0, fmt.Errorf("draft image url is invalid")
 		}
-		payload := sendPhotoRequest{ChatID: chatID, Photo: imageURL, Caption: strings.TrimSpace(draft.Body)}
+		payload := sendPhotoRequest{ChatID: chatID, Photo: imageURL, Caption: truncateRunes(strings.TrimSpace(draft.Body), telegramPhotoCaptionLimit)}
 		return c.send(ctx, "sendPhoto", payload)
 	}
 
@@ -167,4 +168,15 @@ func isHTTPURL(raw string) bool {
 		return false
 	}
 	return strings.TrimSpace(u.Host) != ""
+}
+
+func truncateRunes(text string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	return string(runes[:limit])
 }

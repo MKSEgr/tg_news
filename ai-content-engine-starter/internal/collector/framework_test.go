@@ -50,6 +50,9 @@ func (f *fakeItemRepo) GetByID(context.Context, int64) (domain.SourceItem, error
 func (f *fakeItemRepo) ListBySourceID(context.Context, int64, int) ([]domain.SourceItem, error) {
 	return nil, nil
 }
+func (f *fakeItemRepo) ListRecent(context.Context, int) ([]domain.SourceItem, error) {
+	return nil, nil
+}
 
 type fakeCollector struct {
 	kind  string
