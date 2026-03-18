@@ -161,6 +161,22 @@ func (s *adaptiveScorerStub) ScoreAdaptive(context.Context, domain.SourceItem, i
 	return s.score, nil
 }
 
+type adaptiveFeedbackScorerStub struct {
+	base     int
+	feedback int
+	adaptive int
+}
+
+func (s *adaptiveFeedbackScorerStub) Score(domain.SourceItem) int { return s.base }
+
+func (s *adaptiveFeedbackScorerStub) ScoreWithFeedback(domain.SourceItem, map[int64]float64) int {
+	return s.feedback
+}
+
+func (s *adaptiveFeedbackScorerStub) ScoreAdaptive(context.Context, domain.SourceItem, int64, string) (int, error) {
+	return s.adaptive, nil
+}
+
 type advancedScorerStub struct {
 	base     int
 	memory   int
@@ -648,6 +664,54 @@ func TestPipelineJobRunIgnoresOptionalClusterObserverError(t *testing.T) {
 	}
 }
 
+func TestPipelineJobRunReportsOptionalClusterObserverErrorViaHook(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&routerStub{ids: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	observerErr := errors.New("cluster unavailable")
+	hookCalls := 0
+	job.WithStoryClusterObserver(&clusterObserverStub{err: observerErr})
+	job.WithStoryClusterErrorHook(func(gotItem domain.SourceItem, gotErr error) {
+		hookCalls++
+		if gotItem.ID != item.ID {
+			t.Fatalf("hook item id = %d, want %d", gotItem.ID, item.ID)
+		}
+		if !errors.Is(gotErr, observerErr) {
+			t.Fatalf("hook error = %v, want %v", gotErr, observerErr)
+		}
+	})
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if hookCalls != 1 {
+		t.Fatalf("hook calls = %d, want 1", hookCalls)
+	}
+	if len(drafts.created) != 1 {
+		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
+	}
+}
+
 func TestPipelineJobRunUsesAdaptiveScorePerChannel(t *testing.T) {
 	source := domain.Source{ID: 1, Enabled: true}
 	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
@@ -675,6 +739,37 @@ func TestPipelineJobRunUsesAdaptiveScorePerChannel(t *testing.T) {
 	}
 	if scorer.calls != 1 {
 		t.Fatalf("adaptive scorer calls = %d, want 1", scorer.calls)
+	}
+	if len(drafts.created) != 1 {
+		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunAddsAdaptiveDeltaToPriorScorePath(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channel := domain.Channel{ID: 7, Slug: "ai-news", Name: "AI News"}
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: []domain.Channel{channel}},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&adaptiveFeedbackScorerStub{base: 5, feedback: 15, adaptive: 0},
+		&routerStub{ids: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil, nil, nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
 	}
 	if len(drafts.created) != 1 {
 		t.Fatalf("created drafts = %d, want 1", len(drafts.created))

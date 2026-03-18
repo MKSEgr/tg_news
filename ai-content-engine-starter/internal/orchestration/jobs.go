@@ -45,6 +45,7 @@ type PipelineJob struct {
 	planner            editorialPlanner
 	assetGenerator     intentAssetGenerator
 	clusterObserver    storyClusterObserver
+	clusterErrorHook   func(item domain.SourceItem, err error)
 	recentItemsLimit   int
 	existingDraftLimit int
 }
@@ -390,6 +391,15 @@ func (j *PipelineJob) WithStoryClusterObserver(observer storyClusterObserver) *P
 	return j
 }
 
+// WithStoryClusterErrorHook sets an optional non-blocking hook for cluster observation failures.
+func (j *PipelineJob) WithStoryClusterErrorHook(hook func(item domain.SourceItem, err error)) *PipelineJob {
+	if j == nil {
+		return nil
+	}
+	j.clusterErrorHook = hook
+	return j
+}
+
 // Run executes one orchestration cycle.
 func (j *PipelineJob) Run(ctx context.Context) error {
 	if j == nil {
@@ -522,6 +532,8 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				observedCluster, _, observeErr := j.clusterObserver.ObserveSignal(ctx, normalized)
 				if observeErr == nil {
 					cluster = observedCluster
+				} else if j.clusterErrorHook != nil {
+					j.clusterErrorHook(normalized, observeErr)
 				}
 			}
 			if clusterRouter, ok := j.router.(clusterAwareRouter); ok && cluster.ID > 0 {
@@ -562,7 +574,7 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 					if adaptiveErr != nil {
 						return fmt.Errorf("adaptive score item %d, channel %d: %w", normalized.ID, channelID, adaptiveErr)
 					}
-					channelScore = adaptiveScore
+					channelScore += adaptiveScore - baseScore
 				}
 				if channelScore <= 0 {
 					continue

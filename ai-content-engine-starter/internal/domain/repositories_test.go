@@ -13,6 +13,15 @@ func (stubChannelRepo) Create(context.Context, Channel) (Channel, error) { retur
 func (stubChannelRepo) GetByID(context.Context, int64) (Channel, error)  { return Channel{}, nil }
 func (stubChannelRepo) List(context.Context) ([]Channel, error)          { return nil, nil }
 
+type stubChannelRelationshipRepo struct{}
+
+func (stubChannelRelationshipRepo) Create(context.Context, ChannelRelationship) (ChannelRelationship, error) {
+	return ChannelRelationship{}, nil
+}
+func (stubChannelRelationshipRepo) ListByChannel(context.Context, int64, int) ([]ChannelRelationship, error) {
+	return nil, nil
+}
+
 type stubSourceRepo struct{}
 
 func (stubSourceRepo) Create(context.Context, Source) (Source, error) { return Source{}, nil }
@@ -148,6 +157,7 @@ func (stubPublishIntentRepo) UpdateStatus(context.Context, int64, PublishIntentS
 
 func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ ChannelRepository = stubChannelRepo{}
+	var _ ChannelRelationshipRepository = stubChannelRelationshipRepo{}
 	var _ SourceRepository = stubSourceRepo{}
 	var _ SourceItemRepository = stubSourceItemRepo{}
 	var _ DraftRepository = stubDraftRepo{}

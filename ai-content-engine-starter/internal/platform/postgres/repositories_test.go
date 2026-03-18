@@ -12,6 +12,7 @@ import (
 
 func TestRepositoriesImplementDomainInterfaces(t *testing.T) {
 	var _ domain.ChannelRepository = (*ChannelRepository)(nil)
+	var _ domain.ChannelRelationshipRepository = (*ChannelRelationshipRepository)(nil)
 	var _ domain.SourceRepository = (*SourceRepository)(nil)
 	var _ domain.SourceItemRepository = (*SourceItemRepository)(nil)
 	var _ domain.DraftRepository = (*DraftRepository)(nil)
@@ -187,6 +188,49 @@ func TestAssetRelationshipRepositoryRejectsInvalidInput(t *testing.T) {
 	}
 	if _, err := repo.ListByAssetID(context.Background(), 1, 0); err == nil {
 		t.Fatalf("ListByAssetID expected limit validation error")
+	}
+}
+
+func TestChannelRelationshipRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewChannelRelationshipRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.ChannelRelationship{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ChannelRelationship{
+		ChannelID:        1,
+		RelatedChannelID: 1,
+		RelationshipType: domain.ChannelRelationshipTypeSibling,
+	}); err == nil {
+		t.Fatalf("Create expected self-link validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ChannelRelationship{
+		ChannelID:        1,
+		RelatedChannelID: 2,
+		RelationshipType: "invalid",
+	}); err == nil {
+		t.Fatalf("Create expected relationship type validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ChannelRelationship{
+		ChannelID:        1,
+		RelatedChannelID: 2,
+		RelationshipType: domain.ChannelRelationshipTypeParent,
+		Strength:         -0.1,
+	}); err == nil {
+		t.Fatalf("Create expected negative strength validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ChannelRelationship{
+		ChannelID:        1,
+		RelatedChannelID: 2,
+		RelationshipType: domain.ChannelRelationshipTypeParent,
+		Strength:         1.1,
+	}); err == nil {
+		t.Fatalf("Create expected strength upper-bound validation error")
+	}
+	if _, err := repo.ListByChannel(context.Background(), 0, 10); err == nil {
+		t.Fatalf("ListByChannel expected channel id validation error")
+	}
+	if _, err := repo.ListByChannel(context.Background(), 1, 0); err == nil {
+		t.Fatalf("ListByChannel expected limit validation error")
 	}
 }
 

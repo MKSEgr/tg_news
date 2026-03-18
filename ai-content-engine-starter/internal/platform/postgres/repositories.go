@@ -16,6 +16,11 @@ type ChannelRepository struct {
 	db *sql.DB
 }
 
+// ChannelRelationshipRepository is a PostgreSQL implementation of domain.ChannelRelationshipRepository.
+type ChannelRelationshipRepository struct {
+	db *sql.DB
+}
+
 // SourceRepository is a PostgreSQL implementation of domain.SourceRepository.
 type SourceRepository struct {
 	db *sql.DB
@@ -76,7 +81,10 @@ type PerformanceFeedbackRepository struct {
 	db *sql.DB
 }
 
-func NewChannelRepository(db *sql.DB) *ChannelRepository       { return &ChannelRepository{db: db} }
+func NewChannelRepository(db *sql.DB) *ChannelRepository { return &ChannelRepository{db: db} }
+func NewChannelRelationshipRepository(db *sql.DB) *ChannelRelationshipRepository {
+	return &ChannelRelationshipRepository{db: db}
+}
 func NewSourceRepository(db *sql.DB) *SourceRepository         { return &SourceRepository{db: db} }
 func NewSourceItemRepository(db *sql.DB) *SourceItemRepository { return &SourceItemRepository{db: db} }
 func NewDraftRepository(db *sql.DB) *DraftRepository           { return &DraftRepository{db: db} }
@@ -169,6 +177,82 @@ func (r *ChannelRepository) List(ctx context.Context) ([]domain.Channel, error) 
 		return nil, fmt.Errorf("iterate channels: %w", err)
 	}
 	return channels, nil
+}
+
+func (r *ChannelRelationshipRepository) Create(ctx context.Context, rel domain.ChannelRelationship) (domain.ChannelRelationship, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.ChannelRelationship{}, err
+	}
+	if rel.ChannelID <= 0 {
+		return domain.ChannelRelationship{}, fmt.Errorf("channel id must be greater than zero")
+	}
+	if rel.RelatedChannelID <= 0 {
+		return domain.ChannelRelationship{}, fmt.Errorf("related channel id must be greater than zero")
+	}
+	if rel.ChannelID == rel.RelatedChannelID {
+		return domain.ChannelRelationship{}, fmt.Errorf("channel ids must differ")
+	}
+	rel.RelationshipType = domain.ChannelRelationshipType(strings.ToLower(strings.TrimSpace(string(rel.RelationshipType))))
+	if rel.RelationshipType != domain.ChannelRelationshipTypeParent &&
+		rel.RelationshipType != domain.ChannelRelationshipTypeSibling &&
+		rel.RelationshipType != domain.ChannelRelationshipTypePromotionTarget {
+		return domain.ChannelRelationship{}, fmt.Errorf("relationship type is invalid")
+	}
+	if math.IsNaN(rel.Strength) || math.IsInf(rel.Strength, 0) {
+		return domain.ChannelRelationship{}, fmt.Errorf("strength is invalid")
+	}
+	if rel.Strength < 0 || rel.Strength > 1 {
+		return domain.ChannelRelationship{}, fmt.Errorf("strength must be between 0 and 1")
+	}
+	rel.MetadataJSON = strings.TrimSpace(rel.MetadataJSON)
+	if rel.MetadataJSON == "" {
+		rel.MetadataJSON = "{}"
+	}
+
+	const q = `INSERT INTO channel_relationships (channel_id, related_channel_id, relationship_type, strength, metadata_json)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, channel_id, related_channel_id, relationship_type, strength, metadata_json, created_at`
+	row := r.db.QueryRowContext(ctx, q, rel.ChannelID, rel.RelatedChannelID, rel.RelationshipType, rel.Strength, rel.MetadataJSON)
+	if err := row.Scan(&rel.ID, &rel.ChannelID, &rel.RelatedChannelID, &rel.RelationshipType, &rel.Strength, &rel.MetadataJSON, &rel.CreatedAt); err != nil {
+		return domain.ChannelRelationship{}, fmt.Errorf("create channel relationship: %w", err)
+	}
+	return rel, nil
+}
+
+func (r *ChannelRelationshipRepository) ListByChannel(ctx context.Context, channelID int64, limit int) ([]domain.ChannelRelationship, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if channelID <= 0 {
+		return nil, fmt.Errorf("channel id must be greater than zero")
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, channel_id, related_channel_id, relationship_type, strength, metadata_json, created_at
+		FROM channel_relationships
+		WHERE channel_id = $1
+		ORDER BY strength DESC, id ASC
+		LIMIT $2`
+	rows, err := r.db.QueryContext(ctx, q, channelID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list channel relationships by channel: %w", err)
+	}
+	defer rows.Close()
+
+	rels := make([]domain.ChannelRelationship, 0)
+	for rows.Next() {
+		var rel domain.ChannelRelationship
+		if err := rows.Scan(&rel.ID, &rel.ChannelID, &rel.RelatedChannelID, &rel.RelationshipType, &rel.Strength, &rel.MetadataJSON, &rel.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan channel relationship: %w", err)
+		}
+		rels = append(rels, rel)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate channel relationships: %w", err)
+	}
+	return rels, nil
 }
 
 func (r *SourceRepository) Create(ctx context.Context, source domain.Source) (domain.Source, error) {

@@ -205,7 +205,6 @@ func TestClusterEventsMigrationDownDropsTable(t *testing.T) {
 	}
 }
 
-
 func TestRankingFeaturesMigrationUpContainsTableAndIndexes(t *testing.T) {
 	path := filepath.Join("000018_ranking_features.up.sql")
 	body, err := os.ReadFile(path)
@@ -242,5 +241,73 @@ func TestRankingFeaturesMigrationDownDropsTable(t *testing.T) {
 	sql := string(body)
 	if !strings.Contains(sql, "DROP TABLE IF EXISTS ranking_features") {
 		t.Fatalf("migration down missing DROP TABLE for ranking_features")
+	}
+}
+
+func TestChannelRelationshipsMigrationUpContainsTableAndIndexes(t *testing.T) {
+	path := filepath.Join("000019_channel_relationships.up.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+
+	checks := []string{
+		"CREATE TABLE IF NOT EXISTS channel_relationships",
+		"channel_id BIGINT NOT NULL",
+		"related_channel_id BIGINT NOT NULL",
+		"relationship_type TEXT NOT NULL",
+		"CHECK (relationship_type IN ('parent', 'sibling', 'promotion_target'))",
+		"strength DOUBLE PRECISION NOT NULL DEFAULT 0",
+		"CHECK (strength >= 0 AND strength <= 1)",
+		"metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb",
+		"CHECK (channel_id <> related_channel_id)",
+		"CREATE INDEX IF NOT EXISTS idx_channel_relationships_channel_id",
+		"CREATE INDEX IF NOT EXISTS idx_channel_relationships_related_channel_id",
+		"CREATE INDEX IF NOT EXISTS idx_channel_relationships_type",
+	}
+	for _, want := range checks {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration up missing %q", want)
+		}
+	}
+}
+
+func TestChannelRelationshipsMigrationDownDropsTable(t *testing.T) {
+	path := filepath.Join("000019_channel_relationships.down.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+	if !strings.Contains(sql, "DROP TABLE IF EXISTS channel_relationships") {
+		t.Fatalf("migration down missing DROP TABLE for channel_relationships")
+	}
+}
+
+func TestChannelRelationshipsUniquenessMigrationUpContainsUniqueIndex(t *testing.T) {
+	path := filepath.Join("000020_channel_relationships_uniqueness.up.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+	if !strings.Contains(sql, "CREATE UNIQUE INDEX IF NOT EXISTS idx_channel_relationships_unique_link") {
+		t.Fatalf("migration up missing unique index declaration")
+	}
+	if !strings.Contains(sql, "ON channel_relationships(channel_id, related_channel_id, relationship_type)") {
+		t.Fatalf("migration up missing unique index target columns")
+	}
+}
+
+func TestChannelRelationshipsUniquenessMigrationDownDropsUniqueIndex(t *testing.T) {
+	path := filepath.Join("000020_channel_relationships_uniqueness.down.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+	if !strings.Contains(sql, "DROP INDEX IF EXISTS idx_channel_relationships_unique_link") {
+		t.Fatalf("migration down missing DROP INDEX for channel relationship uniqueness")
 	}
 }

@@ -10,6 +10,26 @@ type Channel struct {
 	CreatedAt time.Time
 }
 
+// ChannelRelationshipType defines the supported static links between channels.
+type ChannelRelationshipType string
+
+const (
+	ChannelRelationshipTypeParent          ChannelRelationshipType = "parent"
+	ChannelRelationshipTypeSibling         ChannelRelationshipType = "sibling"
+	ChannelRelationshipTypePromotionTarget ChannelRelationshipType = "promotion_target"
+)
+
+// ChannelRelationship stores a simple directed relationship between two channels.
+type ChannelRelationship struct {
+	ID               int64
+	ChannelID        int64
+	RelatedChannelID int64
+	RelationshipType ChannelRelationshipType
+	Strength         float64
+	MetadataJSON     string
+	CreatedAt        time.Time
+}
+
 // Source describes an external content source.
 type Source struct {
 	ID        int64

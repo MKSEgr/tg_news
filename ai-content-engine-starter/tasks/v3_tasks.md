@@ -13,3 +13,4 @@
 - [x] V3-011 Implement ranking features storage
 - [x] V3-012 Implement adaptive scoring
 - [x] V3-013 Implement contextual variant selection
+- [x] V3-014 Implement channel relationships

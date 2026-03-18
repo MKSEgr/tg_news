@@ -15,6 +15,12 @@ type ChannelRepository interface {
 	List(ctx context.Context) ([]Channel, error)
 }
 
+// ChannelRelationshipRepository defines persistence operations for channel links.
+type ChannelRelationshipRepository interface {
+	Create(ctx context.Context, rel ChannelRelationship) (ChannelRelationship, error)
+	ListByChannel(ctx context.Context, channelID int64, limit int) ([]ChannelRelationship, error)
+}
+
 // SourceRepository defines persistence operations for sources.
 type SourceRepository interface {
 	Create(ctx context.Context, source Source) (Source, error)

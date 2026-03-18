@@ -86,3 +86,15 @@ func TestRankingFeatureDefaults(t *testing.T) {
 		t.Fatalf("RankingFeature.FeatureValue = %f, want 0", feature.FeatureValue)
 	}
 }
+
+func TestChannelRelationshipTypesAreStable(t *testing.T) {
+	if ChannelRelationshipTypeParent != "parent" {
+		t.Fatalf("ChannelRelationshipTypeParent = %q, want %q", ChannelRelationshipTypeParent, "parent")
+	}
+	if ChannelRelationshipTypeSibling != "sibling" {
+		t.Fatalf("ChannelRelationshipTypeSibling = %q, want %q", ChannelRelationshipTypeSibling, "sibling")
+	}
+	if ChannelRelationshipTypePromotionTarget != "promotion_target" {
+		t.Fatalf("ChannelRelationshipTypePromotionTarget = %q, want %q", ChannelRelationshipTypePromotionTarget, "promotion_target")
+	}
+}
