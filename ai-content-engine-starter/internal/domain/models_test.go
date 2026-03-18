@@ -70,3 +70,12 @@ func TestMonetizationHookTypesAreStable(t *testing.T) {
 		t.Fatalf("MonetizationHookTypeSponsoredCTA = %q, want %q", MonetizationHookTypeSponsoredCTA, "sponsored_cta")
 	}
 }
+
+func TestClusterEventTypesAreStable(t *testing.T) {
+	if ClusterEventTypeSignalAdded != "signal_added" {
+		t.Fatalf("ClusterEventTypeSignalAdded = %q, want %q", ClusterEventTypeSignalAdded, "signal_added")
+	}
+	if ClusterEventTypeAssetAdded != "asset_added" {
+		t.Fatalf("ClusterEventTypeAssetAdded = %q, want %q", ClusterEventTypeAssetAdded, "asset_added")
+	}
+}

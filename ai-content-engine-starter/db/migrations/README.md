@@ -21,4 +21,5 @@ Current bootstrap migration:
 - `000013_content_assets` — creates minimal content assets storage for future asset-based generation.
 - `000014_asset_relationships` — creates minimal explicit links between assets (`derived_from`, `followup_to`).
 - `000015_story_clusters` — creates minimal story cluster storage keyed by `cluster_key`.
-
+- `000016_monetization_hooks` — creates lightweight draft monetization hook storage.
+- `000017_cluster_events` — creates append-only cluster event storage for signal and asset references over time.

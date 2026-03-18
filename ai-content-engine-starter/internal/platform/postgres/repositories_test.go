@@ -19,6 +19,7 @@ func TestRepositoriesImplementDomainInterfaces(t *testing.T) {
 	var _ domain.AssetRelationshipRepository = (*AssetRelationshipRepository)(nil)
 	var _ domain.StoryClusterRepository = (*StoryClusterRepository)(nil)
 	var _ domain.MonetizationHookRepository = (*MonetizationHookRepository)(nil)
+	var _ domain.ClusterEventRepository = (*ClusterEventRepository)(nil)
 	var _ domain.TopicMemoryRepository = (*TopicMemoryRepository)(nil)
 	var _ domain.ContentRuleRepository = (*ContentRuleRepository)(nil)
 	var _ domain.PerformanceFeedbackRepository = (*PerformanceFeedbackRepository)(nil)
@@ -228,5 +229,77 @@ func TestMonetizationHookRepositoryRejectsInvalidInput(t *testing.T) {
 	}
 	if _, err := repo.ListByDraftID(context.Background(), 1, 0); err == nil {
 		t.Fatalf("ListByDraftID expected limit validation error")
+	}
+}
+
+func TestClusterEventRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewClusterEventRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.ClusterEvent{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	invalidRawItemID := int64(0)
+	invalidAssetID := int64(0)
+	validRawItemID := int64(1)
+	validAssetID := int64(2)
+	if _, err := repo.Create(context.Background(), domain.ClusterEvent{
+		StoryClusterID: 1,
+		EventType:      domain.ClusterEventTypeSignalAdded,
+		EventTime:      time.Now().UTC(),
+		RawItemID:      &invalidRawItemID,
+	}); err == nil {
+		t.Fatalf("Create expected raw item id validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ClusterEvent{
+		StoryClusterID: 1,
+		EventType:      domain.ClusterEventTypeAssetAdded,
+		EventTime:      time.Now().UTC(),
+		AssetID:        &invalidAssetID,
+	}); err == nil {
+		t.Fatalf("Create expected asset id validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ClusterEvent{
+		StoryClusterID: 1,
+		EventType:      "invalid",
+		EventTime:      time.Now().UTC(),
+	}); err == nil {
+		t.Fatalf("Create expected event type validation error")
+	}
+	if _, err := repo.ListByClusterID(context.Background(), 0, 10); err == nil {
+		t.Fatalf("ListByClusterID expected cluster id validation error")
+	}
+	if _, err := repo.ListByClusterID(context.Background(), 1, 0); err == nil {
+		t.Fatalf("ListByClusterID expected limit validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ClusterEvent{
+		StoryClusterID: 1,
+		EventType:      domain.ClusterEventTypeSignalAdded,
+		EventTime:      time.Now().UTC(),
+	}); err == nil {
+		t.Fatalf("Create expected missing raw item id validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ClusterEvent{
+		StoryClusterID: 1,
+		EventType:      domain.ClusterEventTypeAssetAdded,
+		EventTime:      time.Now().UTC(),
+	}); err == nil {
+		t.Fatalf("Create expected missing asset id validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ClusterEvent{
+		StoryClusterID: 1,
+		EventType:      domain.ClusterEventTypeSignalAdded,
+		EventTime:      time.Now().UTC(),
+		RawItemID:      &validRawItemID,
+		AssetID:        &validAssetID,
+	}); err == nil {
+		t.Fatalf("Create expected signal_added asset id validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.ClusterEvent{
+		StoryClusterID: 1,
+		EventType:      domain.ClusterEventTypeAssetAdded,
+		EventTime:      time.Now().UTC(),
+		RawItemID:      &validRawItemID,
+		AssetID:        &validAssetID,
+	}); err == nil {
+		t.Fatalf("Create expected asset_added raw item id validation error")
 	}
 }

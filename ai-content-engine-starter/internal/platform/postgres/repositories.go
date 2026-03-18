@@ -56,6 +56,11 @@ type MonetizationHookRepository struct {
 	db *sql.DB
 }
 
+// ClusterEventRepository is a PostgreSQL implementation of domain.ClusterEventRepository.
+type ClusterEventRepository struct {
+	db *sql.DB
+}
+
 // TopicMemoryRepository is a PostgreSQL implementation of domain.TopicMemoryRepository.
 type TopicMemoryRepository struct {
 	db *sql.DB
@@ -89,6 +94,9 @@ func NewStoryClusterRepository(db *sql.DB) *StoryClusterRepository {
 }
 func NewMonetizationHookRepository(db *sql.DB) *MonetizationHookRepository {
 	return &MonetizationHookRepository{db: db}
+}
+func NewClusterEventRepository(db *sql.DB) *ClusterEventRepository {
+	return &ClusterEventRepository{db: db}
 }
 func NewTopicMemoryRepository(db *sql.DB) *TopicMemoryRepository {
 	return &TopicMemoryRepository{db: db}
@@ -699,6 +707,35 @@ type sourceItemScanner interface {
 	Scan(dest ...any) error
 }
 
+func scanClusterEvent(scanner sourceItemScanner, event *domain.ClusterEvent) error {
+	var rawItemID sql.NullInt64
+	var assetID sql.NullInt64
+	if err := scanner.Scan(
+		&event.ID,
+		&event.StoryClusterID,
+		&rawItemID,
+		&assetID,
+		&event.EventType,
+		&event.EventTime,
+		&event.MetadataJSON,
+		&event.CreatedAt,
+	); err != nil {
+		return err
+	}
+
+	event.RawItemID = nil
+	if rawItemID.Valid {
+		value := rawItemID.Int64
+		event.RawItemID = &value
+	}
+	event.AssetID = nil
+	if assetID.Valid {
+		value := assetID.Int64
+		event.AssetID = &value
+	}
+	return nil
+}
+
 func scanContentRule(scanner sourceItemScanner, rule *domain.ContentRule) error {
 	var channelID sql.NullInt64
 	if err := scanner.Scan(&rule.ID, &channelID, &rule.Kind, &rule.Pattern, &rule.Enabled, &rule.CreatedAt, &rule.UpdatedAt); err != nil {
@@ -1052,4 +1089,91 @@ func (r *MonetizationHookRepository) ListByDraftID(ctx context.Context, draftID 
 		return nil, fmt.Errorf("iterate monetization hooks: %w", err)
 	}
 	return hooks, nil
+}
+
+func (r *ClusterEventRepository) Create(ctx context.Context, event domain.ClusterEvent) (domain.ClusterEvent, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.ClusterEvent{}, err
+	}
+	if event.StoryClusterID <= 0 {
+		return domain.ClusterEvent{}, fmt.Errorf("story cluster id must be greater than zero")
+	}
+	event.EventType = domain.ClusterEventType(strings.ToLower(strings.TrimSpace(string(event.EventType))))
+	if event.EventType != domain.ClusterEventTypeSignalAdded && event.EventType != domain.ClusterEventTypeAssetAdded {
+		return domain.ClusterEvent{}, fmt.Errorf("event type is invalid")
+	}
+	if event.EventTime.IsZero() {
+		return domain.ClusterEvent{}, fmt.Errorf("event time is zero")
+	}
+	if event.RawItemID != nil && *event.RawItemID <= 0 {
+		return domain.ClusterEvent{}, fmt.Errorf("raw item id must be greater than zero")
+	}
+	if event.AssetID != nil && *event.AssetID <= 0 {
+		return domain.ClusterEvent{}, fmt.Errorf("asset id must be greater than zero")
+	}
+	switch event.EventType {
+	case domain.ClusterEventTypeSignalAdded:
+		if event.RawItemID == nil {
+			return domain.ClusterEvent{}, fmt.Errorf("signal_added requires raw item id")
+		}
+		if event.AssetID != nil {
+			return domain.ClusterEvent{}, fmt.Errorf("signal_added must not include asset id")
+		}
+	case domain.ClusterEventTypeAssetAdded:
+		if event.AssetID == nil {
+			return domain.ClusterEvent{}, fmt.Errorf("asset_added requires asset id")
+		}
+		if event.RawItemID != nil {
+			return domain.ClusterEvent{}, fmt.Errorf("asset_added must not include raw item id")
+		}
+	}
+	event.MetadataJSON = strings.TrimSpace(event.MetadataJSON)
+	if event.MetadataJSON == "" {
+		event.MetadataJSON = "{}"
+	}
+
+	const q = `INSERT INTO cluster_events (story_cluster_id, raw_item_id, asset_id, event_type, event_time, metadata_json)
+		VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+		RETURNING id, story_cluster_id, raw_item_id, asset_id, event_type, event_time, metadata_json, created_at`
+	row := r.db.QueryRowContext(ctx, q, event.StoryClusterID, event.RawItemID, event.AssetID, event.EventType, event.EventTime, event.MetadataJSON)
+	if err := scanClusterEvent(row, &event); err != nil {
+		return domain.ClusterEvent{}, fmt.Errorf("create cluster event: %w", err)
+	}
+	return event, nil
+}
+
+func (r *ClusterEventRepository) ListByClusterID(ctx context.Context, storyClusterID int64, limit int) ([]domain.ClusterEvent, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if storyClusterID <= 0 {
+		return nil, fmt.Errorf("story cluster id must be greater than zero")
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, story_cluster_id, raw_item_id, asset_id, event_type, event_time, metadata_json, created_at
+		FROM cluster_events
+		WHERE story_cluster_id = $1
+		ORDER BY event_time ASC, id ASC
+		LIMIT $2`
+	rows, err := r.db.QueryContext(ctx, q, storyClusterID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list cluster events by cluster id: %w", err)
+	}
+	defer rows.Close()
+
+	events := make([]domain.ClusterEvent, 0)
+	for rows.Next() {
+		var event domain.ClusterEvent
+		if err := scanClusterEvent(rows, &event); err != nil {
+			return nil, fmt.Errorf("scan cluster event: %w", err)
+		}
+		events = append(events, event)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate cluster events: %w", err)
+	}
+	return events, nil
 }

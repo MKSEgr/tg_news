@@ -1,8 +1,12 @@
 package app
 
 import (
+	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 
+	"ai-content-engine-starter/internal/domain"
 	"ai-content-engine-starter/internal/platform/config"
 	"net/http/httptest"
 	"testing"
@@ -76,7 +80,11 @@ func TestRoutesHealthMethodNotAllowed(t *testing.T) {
 }
 
 func TestRoutesAdminDraftsIsRegistered(t *testing.T) {
-	a := &App{drafts: newAdminMemoryDraftRepository()}
+	repo, err := newAdminFileDraftRepository(filepath.Join(t.TempDir(), "drafts.json"))
+	if err != nil {
+		t.Fatalf("newAdminFileDraftRepository() error = %v", err)
+	}
+	a := &App{drafts: repo}
 	h := a.routes()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/drafts", nil)
@@ -85,5 +93,35 @@ func TestRoutesAdminDraftsIsRegistered(t *testing.T) {
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusOK)
+	}
+}
+
+func TestAdminFileDraftRepositoryPersistsAcrossReload(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "drafts.json")
+	repo, err := newAdminFileDraftRepository(path)
+	if err != nil {
+		t.Fatalf("newAdminFileDraftRepository() error = %v", err)
+	}
+	draft, err := repo.Create(context.Background(), domain.Draft{ID: 5, Title: "t", Body: "b", Status: domain.DraftStatusPending})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if err := repo.UpdateStatus(context.Background(), draft.ID, domain.DraftStatusApproved); err != nil {
+		t.Fatalf("UpdateStatus() error = %v", err)
+	}
+
+	reloaded, err := newAdminFileDraftRepository(path)
+	if err != nil {
+		t.Fatalf("reload repository error = %v", err)
+	}
+	got, err := reloaded.GetByID(context.Background(), draft.ID)
+	if err != nil {
+		t.Fatalf("GetByID() error = %v", err)
+	}
+	if got.Status != domain.DraftStatusApproved {
+		t.Fatalf("status = %q, want %q", got.Status, domain.DraftStatusApproved)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("draft persistence file stat error = %v", err)
 	}
 }

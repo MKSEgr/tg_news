@@ -7,3 +7,4 @@
 - [x] V3-005 Implement asset relationships
 - [x] V3-006 Implement asset generation pipeline
 - [x] V3-007 Implement story_clusters
+- [x] V3-008 Implement cluster events

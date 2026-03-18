@@ -163,3 +163,44 @@ func TestMonetizationHooksMigrationDownDropsTable(t *testing.T) {
 		t.Fatalf("migration down missing DROP TABLE for monetization_hooks")
 	}
 }
+
+func TestClusterEventsMigrationUpContainsTableAndIndexes(t *testing.T) {
+	path := filepath.Join("000017_cluster_events.up.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+
+	checks := []string{
+		"CREATE TABLE IF NOT EXISTS cluster_events",
+		"story_cluster_id BIGINT NOT NULL",
+		"raw_item_id BIGINT",
+		"asset_id BIGINT",
+		"event_type TEXT NOT NULL",
+		"CHECK (event_type IN ('signal_added', 'asset_added'))",
+		"event_time TIMESTAMPTZ NOT NULL",
+		"metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb",
+		"created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+		"CREATE INDEX IF NOT EXISTS idx_cluster_events_story_cluster_id",
+		"CREATE INDEX IF NOT EXISTS idx_cluster_events_event_time",
+		"CREATE INDEX IF NOT EXISTS idx_cluster_events_event_type",
+	}
+	for _, want := range checks {
+		if !strings.Contains(sql, want) {
+			t.Fatalf("migration up missing %q", want)
+		}
+	}
+}
+
+func TestClusterEventsMigrationDownDropsTable(t *testing.T) {
+	path := filepath.Join("000017_cluster_events.down.sql")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", path, err)
+	}
+	sql := string(body)
+	if !strings.Contains(sql, "DROP TABLE IF EXISTS cluster_events") {
+		t.Fatalf("migration down missing DROP TABLE for cluster_events")
+	}
+}

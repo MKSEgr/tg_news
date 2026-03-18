@@ -152,6 +152,14 @@ func (s *advancedScorerStub) ScoreWithFeedback(domain.SourceItem, map[int64]floa
 	return s.base + s.feedback
 }
 
+type channelMemoryScorerStub struct{ base int }
+
+func (s *channelMemoryScorerStub) Score(domain.SourceItem) int { return s.base }
+
+func (s *channelMemoryScorerStub) ScoreWithMemory(_ domain.SourceItem, memories []domain.TopicMemory) int {
+	return s.base + len(memories)
+}
+
 type routerStub struct{ ids []int64 }
 
 func (r *routerStub) Route(domain.SourceItem, []domain.Channel) ([]int64, error) { return r.ids, nil }
@@ -282,6 +290,19 @@ func (r *feedbackRepoStub) GetByDraftID(_ context.Context, draftID int64) (domai
 	}
 	return feedback, nil
 }
+
+type topicMemoryStub struct {
+	topicsByChannel map[int64][]domain.TopicMemory
+	err             error
+}
+
+func (s *topicMemoryStub) TopTopics(_ context.Context, channelID int64, _ int) ([]domain.TopicMemory, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.topicsByChannel[channelID], nil
+}
+
 func TestCollectorJobRun(t *testing.T) {
 	job, err := NewCollectorJob(&collectorStub{})
 	if err != nil {
@@ -614,6 +635,47 @@ func TestPipelineJobRunCombinesMemoryAndFeedbackScoreAdjustments(t *testing.T) {
 	}
 }
 
+func TestPipelineJobRunAppliesMemoryScorePerChannel(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channels := []domain.Channel{
+		{ID: 7, Slug: "ai-news", Name: "AI News"},
+		{ID: 8, Slug: "ai-tools", Name: "AI Tools"},
+	}
+
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: channels},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&channelMemoryScorerStub{base: 0},
+		&routerStub{ids: []int64{7, 8}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		&topicMemoryStub{topicsByChannel: map[int64][]domain.TopicMemory{
+			7: {{ChannelID: 7, Topic: "ai", MentionCount: 1}},
+		}},
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.created) != 1 {
+		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
+	}
+	if drafts.created[0].ChannelID != 7 {
+		t.Fatalf("created draft channel = %d, want 7", drafts.created[0].ChannelID)
+	}
+}
+
 func TestPipelineJobRunMergesFeedbackAndMemoryRouting(t *testing.T) {
 	source := domain.Source{ID: 1, Enabled: true}
 	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
@@ -628,7 +690,7 @@ func TestPipelineJobRunMergesFeedbackAndMemoryRouting(t *testing.T) {
 		&normalizerStub{item: item},
 		&dedupStub{duplicate: false},
 		&scorerStub{score: 10},
-		&advancedRouterStub{idsMemory: []int64{7}, idsFeedback: []int64{8}},
+		&advancedRouterStub{idsMemory: []int64{7, 8}, idsFeedback: []int64{8, 7}},
 		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 7, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
 		&guardStub{result: editorial.Result{Accepted: true}},
 		nil,
@@ -644,6 +706,42 @@ func TestPipelineJobRunMergesFeedbackAndMemoryRouting(t *testing.T) {
 	}
 	if len(drafts.created) != 2 {
 		t.Fatalf("created drafts = %d, want 2", len(drafts.created))
+	}
+}
+
+func TestPipelineJobRunFeedbackRoutingDoesNotInjectFallbackOutsideMemoryMatches(t *testing.T) {
+	source := domain.Source{ID: 1, Enabled: true}
+	item := domain.SourceItem{ID: 11, SourceID: 1, ExternalID: "x", URL: "https://example.com", Title: "AI launch"}
+	channels := []domain.Channel{{ID: 7, Slug: "ai-news", Name: "AI News"}, {ID: 8, Slug: "ai-tools", Name: "AI Tools"}}
+
+	drafts := &draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}}
+	job, err := NewPipelineJob(
+		&sourceRepoStub{sources: []domain.Source{source}},
+		&sourceItemRepoStub{itemsBySource: map[int64][]domain.SourceItem{1: {item}}},
+		&channelRepoStub{channels: channels},
+		drafts,
+		&normalizerStub{item: item},
+		&dedupStub{duplicate: false},
+		&scorerStub{score: 10},
+		&advancedRouterStub{idsMemory: []int64{8}, idsFeedback: []int64{7}},
+		&generatorStub{draft: domain.Draft{SourceItemID: 11, ChannelID: 8, Title: "t", Body: "b", Status: domain.DraftStatusPending}},
+		&guardStub{result: editorial.Result{Accepted: true}},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+
+	if err := job.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(drafts.created) != 1 {
+		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
+	}
+	if drafts.created[0].ChannelID != 8 {
+		t.Fatalf("created draft channel = %d, want 8", drafts.created[0].ChannelID)
 	}
 }
 
@@ -1018,21 +1116,10 @@ func TestMergeRankedRouteIDsPreservesFallbackMatches(t *testing.T) {
 	}
 }
 
-func TestFlattenMemoryDeterministicOrder(t *testing.T) {
-	flattened := flattenMemory(map[int64][]domain.TopicMemory{
-		2: {{ChannelID: 2, Topic: "zeta", MentionCount: 1}, {ChannelID: 2, Topic: "alpha", MentionCount: 3}},
-		1: {{ChannelID: 1, Topic: "beta", MentionCount: 2}, {ChannelID: 1, Topic: "alpha", MentionCount: 1}},
-	})
-
-	if len(flattened) != 4 {
-		t.Fatalf("len(flattened) = %d, want 4", len(flattened))
-	}
-	got := []string{flattened[0].Topic, flattened[1].Topic, flattened[2].Topic, flattened[3].Topic}
-	want := []string{"alpha", "beta", "alpha", "zeta"}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("topic order = %v, want %v", got, want)
-		}
+func TestFilterRouteIDsKeepsOnlyAllowedMatches(t *testing.T) {
+	got := filterRouteIDs([]int64{7, 8, 9}, []int64{8, 9})
+	if len(got) != 2 || got[0] != 8 || got[1] != 9 {
+		t.Fatalf("got = %v, want [8 9]", got)
 	}
 }
 

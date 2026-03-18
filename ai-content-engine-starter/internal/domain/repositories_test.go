@@ -86,6 +86,15 @@ func (stubMonetizationHookRepo) ListByDraftID(context.Context, int64, int) ([]Mo
 	return nil, nil
 }
 
+type stubClusterEventRepo struct{}
+
+func (stubClusterEventRepo) Create(context.Context, ClusterEvent) (ClusterEvent, error) {
+	return ClusterEvent{}, nil
+}
+func (stubClusterEventRepo) ListByClusterID(context.Context, int64, int) ([]ClusterEvent, error) {
+	return nil, nil
+}
+
 type stubTopicMemoryRepo struct{}
 
 func (stubTopicMemoryRepo) UpsertMention(context.Context, TopicMemory) (TopicMemory, error) {
@@ -138,6 +147,7 @@ func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ AssetRelationshipRepository = stubAssetRelationshipRepo{}
 	var _ StoryClusterRepository = stubStoryClusterRepo{}
 	var _ MonetizationHookRepository = stubMonetizationHookRepo{}
+	var _ ClusterEventRepository = stubClusterEventRepo{}
 }
 
 func TestErrNotFoundIsWrappable(t *testing.T) {

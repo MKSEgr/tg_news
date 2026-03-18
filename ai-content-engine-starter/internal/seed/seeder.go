@@ -14,12 +14,12 @@ var DefaultChannels = []domain.Channel{
 	{Slug: "ai-workflows", Name: "AI Workflows"},
 }
 
-// DefaultSources are created when no enabled sources exist yet.
+// DefaultSources are created when no sources exist yet.
 var DefaultSources = []domain.Source{
-	{Kind: "rss", Name: "AI News RSS", Endpoint: "https://example.com/ai-news.rss", Enabled: true},
-	{Kind: "github", Name: "GitHub AI", Endpoint: "https://api.github.com", Enabled: true},
-	{Kind: "reddit", Name: "Reddit AI", Endpoint: "https://www.reddit.com/r/artificial/.json", Enabled: true},
-	{Kind: "producthunt", Name: "Product Hunt", Endpoint: "https://api.producthunt.com/v2/api/graphql", Enabled: true},
+	{Kind: "rss", Name: "AI News RSS", Endpoint: "https://example.com/ai-news.rss", Enabled: false},
+	{Kind: "github", Name: "GitHub AI", Endpoint: "https://api.github.com", Enabled: false},
+	{Kind: "reddit", Name: "Reddit AI", Endpoint: "https://www.reddit.com/r/artificial/.json", Enabled: false},
+	{Kind: "producthunt", Name: "Product Hunt", Endpoint: "https://api.producthunt.com/v2/api/graphql", Enabled: false},
 }
 
 // Seeder bootstraps initial channels and sources for a fresh database.
@@ -57,9 +57,9 @@ func (s *Seeder) Seed(ctx context.Context) error {
 		}
 	}
 
-	sources, err := s.sources.ListEnabled(ctx)
+	sources, err := s.sources.List(ctx)
 	if err != nil {
-		return fmt.Errorf("list enabled sources: %w", err)
+		return fmt.Errorf("list sources: %w", err)
 	}
 	if len(sources) == 0 {
 		for _, source := range DefaultSources {

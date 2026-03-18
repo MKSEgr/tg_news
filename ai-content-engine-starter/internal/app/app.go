@@ -2,12 +2,14 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"sync"
 	"syscall"
@@ -43,11 +45,15 @@ func New() (*App, error) {
 	if err := redis.ValidateAddr(cfg.RedisAddr); err != nil {
 		return nil, fmt.Errorf("validate redis addr: %w", err)
 	}
+	drafts, err := newAdminFileDraftRepository(filepath.Join(os.TempDir(), "ai-content-engine-starter-admin-drafts.json"))
+	if err != nil {
+		return nil, fmt.Errorf("create admin draft repository: %w", err)
+	}
 
 	return &App{
 		cfg:    cfg,
 		logger: logger.New(cfg.AppEnv),
-		drafts: newAdminMemoryDraftRepository(),
+		drafts: drafts,
 	}, nil
 }
 
@@ -115,18 +121,24 @@ func (a *App) routes() http.Handler {
 	return mux
 }
 
-// adminMemoryDraftRepository is an in-process repository used by app runtime wiring.
-// It keeps moderation endpoints functional when external storage wiring is not configured.
-type adminMemoryDraftRepository struct {
+// adminFileDraftRepository is a small persisted repository used by app runtime wiring.
+// It keeps moderation state durable across restarts without adding broader pipeline wiring here.
+type adminFileDraftRepository struct {
 	mu     sync.RWMutex
+	path   string
 	drafts map[int64]domain.Draft
 }
 
-func newAdminMemoryDraftRepository() *adminMemoryDraftRepository {
-	return &adminMemoryDraftRepository{drafts: map[int64]domain.Draft{}}
+func newAdminFileDraftRepository(path string) (*adminFileDraftRepository, error) {
+	path = filepath.Clean(path)
+	repo := &adminFileDraftRepository{path: path, drafts: map[int64]domain.Draft{}}
+	if err := repo.load(); err != nil {
+		return nil, err
+	}
+	return repo, nil
 }
 
-func (r *adminMemoryDraftRepository) Create(_ context.Context, draft domain.Draft) (domain.Draft, error) {
+func (r *adminFileDraftRepository) Create(_ context.Context, draft domain.Draft) (domain.Draft, error) {
 	if r == nil {
 		return domain.Draft{}, errors.New("draft repository is unavailable")
 	}
@@ -136,10 +148,13 @@ func (r *adminMemoryDraftRepository) Create(_ context.Context, draft domain.Draf
 		draft.ID = int64(len(r.drafts) + 1)
 	}
 	r.drafts[draft.ID] = draft
+	if err := r.saveLocked(); err != nil {
+		return domain.Draft{}, err
+	}
 	return draft, nil
 }
 
-func (r *adminMemoryDraftRepository) GetByID(_ context.Context, id int64) (domain.Draft, error) {
+func (r *adminFileDraftRepository) GetByID(_ context.Context, id int64) (domain.Draft, error) {
 	if r == nil {
 		return domain.Draft{}, errors.New("draft repository is unavailable")
 	}
@@ -152,7 +167,7 @@ func (r *adminMemoryDraftRepository) GetByID(_ context.Context, id int64) (domai
 	return draft, nil
 }
 
-func (r *adminMemoryDraftRepository) ListByStatus(_ context.Context, status domain.DraftStatus, limit int) ([]domain.Draft, error) {
+func (r *adminFileDraftRepository) ListByStatus(_ context.Context, status domain.DraftStatus, limit int) ([]domain.Draft, error) {
 	if r == nil {
 		return nil, errors.New("draft repository is unavailable")
 	}
@@ -174,7 +189,7 @@ func (r *adminMemoryDraftRepository) ListByStatus(_ context.Context, status doma
 	return list, nil
 }
 
-func (r *adminMemoryDraftRepository) UpdateStatus(_ context.Context, id int64, status domain.DraftStatus) error {
+func (r *adminFileDraftRepository) UpdateStatus(_ context.Context, id int64, status domain.DraftStatus) error {
 	if r == nil {
 		return errors.New("draft repository is unavailable")
 	}
@@ -186,6 +201,46 @@ func (r *adminMemoryDraftRepository) UpdateStatus(_ context.Context, id int64, s
 	}
 	draft.Status = status
 	r.drafts[id] = draft
+	return r.saveLocked()
+}
+
+func (r *adminFileDraftRepository) load() error {
+	if r == nil {
+		return errors.New("draft repository is unavailable")
+	}
+	body, err := os.ReadFile(r.path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("read admin drafts file: %w", err)
+	}
+	if len(body) == 0 {
+		return nil
+	}
+	var drafts []domain.Draft
+	if err := json.Unmarshal(body, &drafts); err != nil {
+		return fmt.Errorf("unmarshal admin drafts file: %w", err)
+	}
+	for _, draft := range drafts {
+		r.drafts[draft.ID] = draft
+	}
+	return nil
+}
+
+func (r *adminFileDraftRepository) saveLocked() error {
+	list := make([]domain.Draft, 0, len(r.drafts))
+	for _, draft := range r.drafts {
+		list = append(list, draft)
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
+	body, err := json.Marshal(list)
+	if err != nil {
+		return fmt.Errorf("marshal admin drafts file: %w", err)
+	}
+	if err := os.WriteFile(r.path, body, 0o644); err != nil {
+		return fmt.Errorf("write admin drafts file: %w", err)
+	}
 	return nil
 }
 

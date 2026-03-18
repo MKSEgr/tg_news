@@ -156,6 +156,26 @@ type MonetizationHook struct {
 	UpdatedAt  time.Time
 }
 
+// ClusterEventType defines the supported append-only cluster event kinds.
+type ClusterEventType string
+
+const (
+	ClusterEventTypeSignalAdded ClusterEventType = "signal_added"
+	ClusterEventTypeAssetAdded  ClusterEventType = "asset_added"
+)
+
+// ClusterEvent stores append-only links between a story cluster and observed signals/assets.
+type ClusterEvent struct {
+	ID             int64
+	StoryClusterID int64
+	RawItemID      *int64
+	AssetID        *int64
+	EventType      ClusterEventType
+	EventTime      time.Time
+	MetadataJSON   string
+	CreatedAt      time.Time
+}
+
 // TopicMemory stores deterministic per-channel topic frequency memory.
 type TopicMemory struct {
 	ID           int64

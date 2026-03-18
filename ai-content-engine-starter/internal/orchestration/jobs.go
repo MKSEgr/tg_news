@@ -430,14 +430,12 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 
 			baseScore := j.scorer.Score(normalized)
 			score := baseScore
-			if memoryScorer, ok := j.scorer.(memoryAwareScorer); ok {
-				score = memoryScorer.ScoreWithMemory(normalized, flattenMemory(memoryByChannel))
-			}
 			if feedbackScorer, ok := j.scorer.(feedbackAwareScorer); ok {
 				feedbackOnlyDelta := feedbackScorer.ScoreWithFeedback(normalized, feedbackByChannel) - baseScore
 				score += feedbackOnlyDelta
 			}
-			if score <= 0 {
+			memoryScorer, hasMemoryScorer := j.scorer.(memoryAwareScorer)
+			if score <= 0 && !hasMemoryScorer {
 				continue
 			}
 
@@ -450,7 +448,7 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 				if feedbackErr != nil {
 					return fmt.Errorf("route item %d: %w", item.ID, feedbackErr)
 				}
-				targetIDs = mergeRankedRouteIDs(feedbackIDs, targetIDs)
+				targetIDs = mergeRankedRouteIDs(filterRouteIDs(feedbackIDs, targetIDs), targetIDs)
 			}
 			if err != nil {
 				return fmt.Errorf("route item %d: %w", item.ID, err)
@@ -481,6 +479,13 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 					if !allowed {
 						continue
 					}
+				}
+				channelScore := score
+				if hasMemoryScorer {
+					channelScore = score + (memoryScorer.ScoreWithMemory(normalized, memoryByChannel[channelID]) - baseScore)
+				}
+				if channelScore <= 0 {
+					continue
 				}
 
 				variants := make([]domain.Draft, 0, 2)
@@ -558,6 +563,25 @@ func mergeRankedRouteIDs(primary []int64, fallback []int64) []int64 {
 	return out
 }
 
+func filterRouteIDs(ids []int64, allowed []int64) []int64 {
+	if len(ids) == 0 || len(allowed) == 0 {
+		return nil
+	}
+	allowedSet := make(map[int64]struct{}, len(allowed))
+	for _, id := range allowed {
+		if id > 0 {
+			allowedSet[id] = struct{}{}
+		}
+	}
+	out := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := allowedSet[id]; ok {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 func pipelineRuleText(item domain.SourceItem) string {
 	text := strings.TrimSpace(item.Title)
 	if item.Body != nil {
@@ -571,33 +595,6 @@ func pipelineRuleText(item domain.SourceItem) string {
 		}
 	}
 	return text
-}
-
-func flattenMemory(memoryByChannel map[int64][]domain.TopicMemory) []domain.TopicMemory {
-	if len(memoryByChannel) == 0 {
-		return nil
-	}
-
-	channelIDs := make([]int64, 0, len(memoryByChannel))
-	for channelID := range memoryByChannel {
-		channelIDs = append(channelIDs, channelID)
-	}
-	sort.Slice(channelIDs, func(i, j int) bool { return channelIDs[i] < channelIDs[j] })
-
-	out := make([]domain.TopicMemory, 0)
-	for _, channelID := range channelIDs {
-		topics := append([]domain.TopicMemory(nil), memoryByChannel[channelID]...)
-		sort.Slice(topics, func(i, j int) bool {
-			left := strings.TrimSpace(strings.ToLower(topics[i].Topic))
-			right := strings.TrimSpace(strings.ToLower(topics[j].Topic))
-			if left == right {
-				return topics[i].MentionCount > topics[j].MentionCount
-			}
-			return left < right
-		})
-		out = append(out, topics...)
-	}
-	return out
 }
 
 func (j *PipelineJob) channelFeedbackAverages(ctx context.Context) (map[int64]float64, error) {

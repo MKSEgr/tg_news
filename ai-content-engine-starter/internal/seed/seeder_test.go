@@ -28,11 +28,13 @@ func (f *fakeChannelRepo) List(context.Context) ([]domain.Channel, error) {
 type fakeSourceRepo struct {
 	listResult []domain.Source
 	createCall int
+	created    []domain.Source
 	listErr    error
 }
 
 func (f *fakeSourceRepo) Create(_ context.Context, s domain.Source) (domain.Source, error) {
 	f.createCall++
+	f.created = append(f.created, s)
 	return s, nil
 }
 func (f *fakeSourceRepo) GetByID(context.Context, int64) (domain.Source, error) {
@@ -59,11 +61,16 @@ func TestSeedCreatesDefaultsWhenEmpty(t *testing.T) {
 	if sources.createCall != len(DefaultSources) {
 		t.Fatalf("source create calls = %d, want %d", sources.createCall, len(DefaultSources))
 	}
+	for i, source := range sources.created {
+		if source.Enabled {
+			t.Fatalf("created source %d enabled = true, want false", i)
+		}
+	}
 }
 
 func TestSeedSkipsWhenDataExists(t *testing.T) {
 	channels := &fakeChannelRepo{listResult: []domain.Channel{{ID: 1, Slug: "ai-news", Name: "AI News"}}}
-	sources := &fakeSourceRepo{listResult: []domain.Source{{ID: 1, Name: "AI News RSS", Enabled: true}}}
+	sources := &fakeSourceRepo{listResult: []domain.Source{{ID: 1, Name: "AI News RSS", Enabled: false}}}
 	seeder := New(channels, sources)
 
 	if err := seeder.Seed(context.Background()); err != nil {
@@ -71,6 +78,19 @@ func TestSeedSkipsWhenDataExists(t *testing.T) {
 	}
 	if channels.createCall != 0 {
 		t.Fatalf("channel create calls = %d, want 0", channels.createCall)
+	}
+	if sources.createCall != 0 {
+		t.Fatalf("source create calls = %d, want 0", sources.createCall)
+	}
+}
+
+func TestSeedSkipsWhenOnlyDisabledSourcesExist(t *testing.T) {
+	channels := &fakeChannelRepo{}
+	sources := &fakeSourceRepo{listResult: []domain.Source{{ID: 1, Name: "AI News RSS", Enabled: false}}}
+	seeder := New(channels, sources)
+
+	if err := seeder.Seed(context.Background()); err != nil {
+		t.Fatalf("Seed() error = %v", err)
 	}
 	if sources.createCall != 0 {
 		t.Fatalf("source create calls = %d, want 0", sources.createCall)

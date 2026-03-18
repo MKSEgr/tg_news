@@ -68,3 +68,4 @@
 - V3-006 completed: added a minimal asset generation service that maps publish_intents to 1:1 content_assets using source-item content, optional non-blocking orchestration invocation, and focused mapping/duplicate/integration tests.
 - V3-007 completed: added minimal story_clusters schema migration, domain/repository contracts, PostgreSQL repository create/get/find methods, and focused migration/repository validation tests without clustering logic or pipeline integration.
 - V3-003 completed: added minimal monetization_hooks schema, domain model/repository contracts, PostgreSQL repository create/get/list methods, and focused validation/migration tests without pipeline integration.
+- V3-008 completed: added append-only cluster_events schema, domain/repository contracts, PostgreSQL repository create/list methods, and focused migration/repository validation tests without planner or pipeline integration.

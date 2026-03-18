@@ -72,6 +72,12 @@ type MonetizationHookRepository interface {
 	ListByDraftID(ctx context.Context, draftID int64, limit int) ([]MonetizationHook, error)
 }
 
+// ClusterEventRepository defines persistence operations for append-only cluster events.
+type ClusterEventRepository interface {
+	Create(ctx context.Context, event ClusterEvent) (ClusterEvent, error)
+	ListByClusterID(ctx context.Context, storyClusterID int64, limit int) ([]ClusterEvent, error)
+}
+
 // TopicMemoryRepository defines persistence operations for topic memory.
 type TopicMemoryRepository interface {
 	UpsertMention(ctx context.Context, memory TopicMemory) (TopicMemory, error)
