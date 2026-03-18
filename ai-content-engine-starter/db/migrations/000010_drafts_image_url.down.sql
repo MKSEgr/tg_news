@@ -1,0 +1,2 @@
+ALTER TABLE drafts
+DROP COLUMN IF EXISTS image_url;
