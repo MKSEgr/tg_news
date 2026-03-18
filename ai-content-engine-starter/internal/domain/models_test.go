@@ -45,3 +45,12 @@ func TestContentAssetStatusIsStable(t *testing.T) {
 		t.Fatalf("ContentAssetStatusPending = %q, want %q", ContentAssetStatusPending, "pending")
 	}
 }
+
+func TestAssetRelationshipTypesAreStable(t *testing.T) {
+	if AssetRelationshipTypeDerivedFrom != "derived_from" {
+		t.Fatalf("AssetRelationshipTypeDerivedFrom = %q, want %q", AssetRelationshipTypeDerivedFrom, "derived_from")
+	}
+	if AssetRelationshipTypeFollowupTo != "followup_to" {
+		t.Fatalf("AssetRelationshipTypeFollowupTo = %q, want %q", AssetRelationshipTypeFollowupTo, "followup_to")
+	}
+}

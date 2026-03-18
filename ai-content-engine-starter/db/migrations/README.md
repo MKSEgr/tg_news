@@ -19,3 +19,5 @@ Current bootstrap migration:
 - `000008_variant_attribution` — adds explicit A/B variant attribution to performance feedback rows for variant-level analytics.
 - `000009_topic_memory_default_positive` — aligns `topic_memory.mention_count` default with positive-count constraint.
 - `000013_content_assets` — creates minimal content assets storage for future asset-based generation.
+- `000014_asset_relationships` — creates minimal explicit links between assets (`derived_from`, `followup_to`).
+

@@ -16,6 +16,7 @@ func TestRepositoriesImplementDomainInterfaces(t *testing.T) {
 	var _ domain.DraftRepository = (*DraftRepository)(nil)
 	var _ domain.PublishIntentRepository = (*PublishIntentRepository)(nil)
 	var _ domain.ContentAssetRepository = (*ContentAssetRepository)(nil)
+	var _ domain.AssetRelationshipRepository = (*AssetRelationshipRepository)(nil)
 	var _ domain.TopicMemoryRepository = (*TopicMemoryRepository)(nil)
 	var _ domain.ContentRuleRepository = (*ContentRuleRepository)(nil)
 	var _ domain.PerformanceFeedbackRepository = (*PerformanceFeedbackRepository)(nil)
@@ -156,5 +157,24 @@ func TestContentAssetRepositoryRejectsInvalidInput(t *testing.T) {
 	}
 	if _, err := repo.ListByRawItemID(context.Background(), 1, 0); err == nil {
 		t.Fatalf("ListByRawItemID expected limit validation error")
+	}
+}
+
+func TestAssetRelationshipRepositoryRejectsInvalidInput(t *testing.T) {
+	repo := NewAssetRelationshipRepository(&sql.DB{})
+	if _, err := repo.Create(context.Background(), domain.AssetRelationship{}); err == nil {
+		t.Fatalf("Create expected validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.AssetRelationship{FromAssetID: 1, ToAssetID: 1, RelationshipType: domain.AssetRelationshipTypeDerivedFrom}); err == nil {
+		t.Fatalf("Create expected self-link validation error")
+	}
+	if _, err := repo.Create(context.Background(), domain.AssetRelationship{FromAssetID: 1, ToAssetID: 2, RelationshipType: "invalid"}); err == nil {
+		t.Fatalf("Create expected relationship type validation error")
+	}
+	if _, err := repo.ListByAssetID(context.Background(), 0, 10); err == nil {
+		t.Fatalf("ListByAssetID expected asset id validation error")
+	}
+	if _, err := repo.ListByAssetID(context.Background(), 1, 0); err == nil {
+		t.Fatalf("ListByAssetID expected limit validation error")
 	}
 }

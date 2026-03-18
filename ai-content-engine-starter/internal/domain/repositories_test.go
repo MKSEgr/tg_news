@@ -53,6 +53,15 @@ func (stubContentAssetRepo) ListByRawItemID(context.Context, int64, int) ([]Cont
 	return nil, nil
 }
 
+type stubAssetRelationshipRepo struct{}
+
+func (stubAssetRelationshipRepo) Create(context.Context, AssetRelationship) (AssetRelationship, error) {
+	return AssetRelationship{}, nil
+}
+func (stubAssetRelationshipRepo) ListByAssetID(context.Context, int64, int) ([]AssetRelationship, error) {
+	return nil, nil
+}
+
 type stubTopicMemoryRepo struct{}
 
 func (stubTopicMemoryRepo) UpsertMention(context.Context, TopicMemory) (TopicMemory, error) {
@@ -102,6 +111,7 @@ func TestRepositoryInterfacesImplementedByStubs(t *testing.T) {
 	var _ PerformanceFeedbackRepository = stubPerformanceFeedbackRepo{}
 	var _ PublishIntentRepository = stubPublishIntentRepo{}
 	var _ ContentAssetRepository = stubContentAssetRepo{}
+	var _ AssetRelationshipRepository = stubAssetRelationshipRepo{}
 }
 
 func TestErrNotFoundIsWrappable(t *testing.T) {

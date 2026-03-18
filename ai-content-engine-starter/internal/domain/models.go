@@ -107,6 +107,23 @@ type ContentAsset struct {
 	UpdatedAt time.Time
 }
 
+// AssetRelationshipType defines explicit supported links between assets.
+type AssetRelationshipType string
+
+const (
+	AssetRelationshipTypeDerivedFrom AssetRelationshipType = "derived_from"
+	AssetRelationshipTypeFollowupTo  AssetRelationshipType = "followup_to"
+)
+
+// AssetRelationship stores a direct relationship between two content assets.
+type AssetRelationship struct {
+	ID               int64
+	FromAssetID      int64
+	ToAssetID        int64
+	RelationshipType AssetRelationshipType
+	CreatedAt        time.Time
+}
+
 // TopicMemory stores deterministic per-channel topic frequency memory.
 type TopicMemory struct {
 	ID           int64

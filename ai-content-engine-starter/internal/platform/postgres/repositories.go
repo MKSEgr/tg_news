@@ -41,6 +41,11 @@ type ContentAssetRepository struct {
 	db *sql.DB
 }
 
+// AssetRelationshipRepository is a PostgreSQL implementation of domain.AssetRelationshipRepository.
+type AssetRelationshipRepository struct {
+	db *sql.DB
+}
+
 // TopicMemoryRepository is a PostgreSQL implementation of domain.TopicMemoryRepository.
 type TopicMemoryRepository struct {
 	db *sql.DB
@@ -65,6 +70,9 @@ func NewPublishIntentRepository(db *sql.DB) *PublishIntentRepository {
 }
 func NewContentAssetRepository(db *sql.DB) *ContentAssetRepository {
 	return &ContentAssetRepository{db: db}
+}
+func NewAssetRelationshipRepository(db *sql.DB) *AssetRelationshipRepository {
+	return &AssetRelationshipRepository{db: db}
 }
 func NewTopicMemoryRepository(db *sql.DB) *TopicMemoryRepository {
 	return &TopicMemoryRepository{db: db}
@@ -808,4 +816,68 @@ func (r *ContentAssetRepository) ListByRawItemID(ctx context.Context, rawItemID 
 		return nil, fmt.Errorf("iterate content assets: %w", err)
 	}
 	return assets, nil
+}
+
+func (r *AssetRelationshipRepository) Create(ctx context.Context, rel domain.AssetRelationship) (domain.AssetRelationship, error) {
+	if err := ensureDB(r.db); err != nil {
+		return domain.AssetRelationship{}, err
+	}
+	if rel.FromAssetID <= 0 {
+		return domain.AssetRelationship{}, fmt.Errorf("from asset id must be greater than zero")
+	}
+	if rel.ToAssetID <= 0 {
+		return domain.AssetRelationship{}, fmt.Errorf("to asset id must be greater than zero")
+	}
+	if rel.FromAssetID == rel.ToAssetID {
+		return domain.AssetRelationship{}, fmt.Errorf("from and to asset ids must differ")
+	}
+	rel.RelationshipType = domain.AssetRelationshipType(strings.ToLower(strings.TrimSpace(string(rel.RelationshipType))))
+	if rel.RelationshipType != domain.AssetRelationshipTypeDerivedFrom && rel.RelationshipType != domain.AssetRelationshipTypeFollowupTo {
+		return domain.AssetRelationship{}, fmt.Errorf("relationship type is invalid")
+	}
+
+	const q = `INSERT INTO asset_relationships (from_asset_id, to_asset_id, relationship_type)
+		VALUES ($1, $2, $3)
+		RETURNING id, from_asset_id, to_asset_id, relationship_type, created_at`
+	row := r.db.QueryRowContext(ctx, q, rel.FromAssetID, rel.ToAssetID, rel.RelationshipType)
+	if err := row.Scan(&rel.ID, &rel.FromAssetID, &rel.ToAssetID, &rel.RelationshipType, &rel.CreatedAt); err != nil {
+		return domain.AssetRelationship{}, fmt.Errorf("create asset relationship: %w", err)
+	}
+	return rel, nil
+}
+
+func (r *AssetRelationshipRepository) ListByAssetID(ctx context.Context, assetID int64, limit int) ([]domain.AssetRelationship, error) {
+	if err := ensureDB(r.db); err != nil {
+		return nil, err
+	}
+	if assetID <= 0 {
+		return nil, fmt.Errorf("asset id must be greater than zero")
+	}
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+
+	const q = `SELECT id, from_asset_id, to_asset_id, relationship_type, created_at
+		FROM asset_relationships
+		WHERE from_asset_id = $1 OR to_asset_id = $1
+		ORDER BY id DESC
+		LIMIT $2`
+	rows, err := r.db.QueryContext(ctx, q, assetID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list asset relationships by asset id: %w", err)
+	}
+	defer rows.Close()
+
+	rels := make([]domain.AssetRelationship, 0)
+	for rows.Next() {
+		var rel domain.AssetRelationship
+		if err := rows.Scan(&rel.ID, &rel.FromAssetID, &rel.ToAssetID, &rel.RelationshipType, &rel.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan asset relationship: %w", err)
+		}
+		rels = append(rels, rel)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate asset relationships: %w", err)
+	}
+	return rels, nil
 }

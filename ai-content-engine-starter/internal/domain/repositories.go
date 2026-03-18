@@ -52,6 +52,12 @@ type ContentAssetRepository interface {
 	ListByRawItemID(ctx context.Context, rawItemID int64, limit int) ([]ContentAsset, error)
 }
 
+// AssetRelationshipRepository defines persistence operations for asset links.
+type AssetRelationshipRepository interface {
+	Create(ctx context.Context, rel AssetRelationship) (AssetRelationship, error)
+	ListByAssetID(ctx context.Context, assetID int64, limit int) ([]AssetRelationship, error)
+}
+
 // TopicMemoryRepository defines persistence operations for topic memory.
 type TopicMemoryRepository interface {
 	UpsertMention(ctx context.Context, memory TopicMemory) (TopicMemory, error)

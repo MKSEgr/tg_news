@@ -64,4 +64,5 @@
 - V3-001 completed: added minimal editorial planner module, publish_intents domain/repository/migration, and optional orchestration hook to create one deterministic publish intent per item using scorer+router.
 - V3-002 completed: formalized publish intent statuses/semantics, added publish_intents status+uniqueness constraints, strengthened planner idempotency for raw item + channel, and added repository/status validation tests.
 - V3-004 completed: added minimal content_assets schema migration, domain/repository contracts, PostgreSQL repository methods (create/get/list), and focused repository+migration tests without pipeline integration.
+- V3-005 completed: added minimal asset_relationships schema, relationship types (derived_from/followup_to), repository contract + postgres create/list methods, and focused migration/repository validation tests without traversal logic.
 
