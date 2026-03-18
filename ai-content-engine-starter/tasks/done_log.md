@@ -7,3 +7,69 @@
   - tasks/
   - prompts/
   - agents/
+
+- MVP-001 completed: created initial Go project skeleton (go.mod, cmd/app entrypoint, internal app package).
+- MVP-002 completed: added environment-based config loader with defaults and validation for HTTP port.
+- MVP-003 completed: added structured JSON logger with environment-based log level and app startup log.
+- MVP-004 completed: added graceful shutdown handling for SIGINT/SIGTERM in app lifecycle.
+- MVP-005 completed: added HTTP server startup/shutdown flow and /health endpoint returning status ok.
+- MVP-006 completed: added PostgreSQL DSN config requirement and bootstrap validation package.
+- MVP-007 completed: added Redis address config requirement and bootstrap validation package.
+- MVP-008 completed: added Docker Compose for app, PostgreSQL, and Redis with healthchecks.
+- MVP-009 completed: added initial PostgreSQL SQL migrations for channels, sources, source items, and drafts.
+- MVP-010 completed: added core domain models and draft status constants aligned with initial schema.
+- MVP-011 completed: added domain repository interfaces for channels, sources, source items, and drafts.
+- MVP-012 completed: added PostgreSQL repository implementations for channels, sources, source items, and drafts.
+- MVP-013 completed: added idempotent source/channel seed service with defaults and unit tests.
+- MVP-014 completed: added collector framework orchestration with collector registry and persistence flow.
+- MVP-015 completed: implemented RSS collector with HTTP fetch, XML parsing, and source item mapping.
+- MVP-016 completed: implemented GitHub collector with API fetch, JSON parsing, and source item mapping.
+- MVP-017 completed: implemented Reddit collector with listing fetch, JSON parsing, and source item mapping.
+- MVP-018 completed: implemented Product Hunt collector with endpoint validation, optional endpoint-driven auth headers/token, JSON parsing, and source item mapping.
+- MVP-019 completed: added normalizer service for canonical URL and text normalization with validation and unit tests.
+- MVP-020 completed: added dedup service with recent-item checks (external_id/url/title), validation, and unit tests.
+- MVP-021 completed: added trend scorer service with recency+keyword scoring and unit tests.
+- MVP-022 completed: added channel router service with keyword-based routing and fallback channel selection, with unit tests.
+- MVP-023 completed: added minimal Yandex AI client with request/response handling, validation, and unit tests.
+- MVP-024 completed: added content generator service integrating AI client to produce pending drafts with prompt building and unit tests.
+- MVP-025 completed: added editorial guard service with draft validation rules and focused unit tests.
+- MVP-026 completed: added minimal scheduler with periodic job execution, cancellation handling, and unit tests.
+- MVP-027 completed: added Telegram publisher client with sendMessage integration, validation, and unit tests.
+- MVP-028 completed: added orchestration jobs for collection and draft pipeline (normalize, dedup, score, route, generate, editorial check, store), with focused unit tests.
+- MVP-029 completed: added admin HTTP API handlers for listing drafts and approve/reject moderation actions, with focused handler tests.
+- MVP-030 completed: added focused core-logic tests for admin handler defaults/method behavior and orchestration constructor/run validation paths.
+- MVP-031 completed: final MVP cleanup by tightening admin API method-mismatch test to assert method handling without redirect coupling.
+- V2-001 completed: added PostgreSQL-backed deterministic topic memory (schema, domain model, repository, and service with focused tests).
+- V2-002 completed: added PostgreSQL-backed blacklist/whitelist content rules (schema, domain/repository contracts, postgres repository, deterministic evaluator service, and tests).
+- V2-003 completed: added PostgreSQL-backed deterministic performance feedback loop (schema, domain/repository contracts, postgres repository, and feedback service with tests).
+
+
+- V2-004 completed: integrated topic memory signals into scorer, router, editorial guard, and pipeline orchestration with backward-compatible optional interfaces and focused tests.
+- V2-005 completed: integrated content-rules evaluation into pipeline routing flow with optional dependency, channel-level block handling, and focused orchestration tests.
+- V2-006 completed: integrated performance feedback into pipeline scoring/routing/generation through optional feedback-aware interfaces and channel feedback averages with focused tests.
+- V2-007 completed: implemented deterministic A/B draft variants (schema + domain + repositories + generator + orchestration integration) with focused tests.
+- V2-008 completed: added variant attribution to performance feedback persistence (migration + domain/repository updates) with focused validation coverage.
+- V2-009 completed: added deterministic auto-repost orchestration job that promotes high-performing posted drafts back to approved with cooldown/threshold limits and focused tests.
+- V2-010 completed: added deterministic per-channel analytics service (posted/feedback counts, avg score, variant A/B averages, last posted timestamp) with focused unit tests.
+- V2-011 completed: added minimal Telegram admin-bot command service (/pending, /approve, /reject, /help) with chat allowlist, deterministic formatting, and focused tests.
+- V2-012 completed: added basic web UI root page with quick links to health and moderation endpoints, route wiring in app, and focused handler tests plus screenshot artifact.
+- V2-013 completed: added deterministic image enrichment service (direct URL/markdown/html/body URL heuristics), optional pipeline integration hook, SourceItem image URL field, and focused tests.
+- V2-014 completed: extended Telegram publisher to post image drafts via sendPhoto when image URL is present, propagated image URL into created drafts in pipeline, and added focused tests.
+- V2-015 completed: added deterministic automatic source discovery service that derives RSS candidates from collected item URLs, excludes existing hosts/endpoints, and returns sorted capped candidates with focused tests.
+- V2-016 completed: integrated source discovery with optional analytics gating (skip discovery for channels with negative feedback average) and channel rule filtering, with focused tests.
+
+- V2-017 completed: performed final architecture review based on implemented V2 modules and architecture maps; documented critical/medium/low issues, central modules/tables, and follow-up risk focus in docs/v2_architecture_review.md.
+- V2-018 completed: added centralized V2 feature flags with validation in config, added rollout plan documentation, and updated app runtime admin composition to use an in-process draft repository instead of an always-unavailable fallback.
+- V2-018 refinement: expanded rollout documentation with phase-based validation/rollback plan, full feature-flag matrix, and rollout-focused cleanup plan tied to architecture review findings.
+- V3-001 completed: added minimal editorial planner module, publish_intents domain/repository/migration, and optional orchestration hook to create one deterministic publish intent per item using scorer+router.
+- V3-002 completed: formalized publish intent statuses/semantics, added publish_intents status+uniqueness constraints, strengthened planner idempotency for raw item + channel, and added repository/status validation tests.
+- V3-004 completed: added minimal content_assets schema migration, domain/repository contracts, PostgreSQL repository methods (create/get/list), and focused repository+migration tests without pipeline integration.
+- V3-005 completed: added minimal asset_relationships schema, relationship types (derived_from/followup_to), repository contract + postgres create/list methods, and focused migration/repository validation tests without traversal logic.
+- V3-006 completed: added a minimal asset generation service that maps publish_intents to 1:1 content_assets using source-item content, optional non-blocking orchestration invocation, and focused mapping/duplicate/integration tests.
+- V3-007 completed: added minimal story_clusters schema migration, domain/repository contracts, PostgreSQL repository create/get/find methods, and focused migration/repository validation tests without clustering logic or pipeline integration.
+- V3-003 completed: added minimal monetization_hooks schema, domain model/repository contracts, PostgreSQL repository create/get/list methods, and focused validation/migration tests without pipeline integration.
+- V3-008 completed: added append-only cluster_events schema, domain/repository contracts, PostgreSQL repository create/list methods, and focused migration/repository validation tests without planner or pipeline integration.
+- V3-009 completed: added a standalone deterministic story cluster detection service that derives stable cluster keys from source-item text, reuses or creates story_clusters, appends signal_added cluster_events, and includes focused unit tests without editorial planner integration.
+- V3-010 completed: integrated optional story cluster context into pipeline routing and generation via additive interfaces, soft routing hints, cluster-aware generator prompt support, and focused orchestration/router/generator tests without making clusters mandatory.
+- V3-011 completed: added flexible ranking_features storage (migration, domain/repository contracts, PostgreSQL create/list methods, and focused validation/migration tests) without ranking logic, weights, or analytics coupling.
+- V3-012 completed: added a deterministic adaptive scoring layer that applies bounded channel/topic/format modifiers from ranking_features, optional pipeline integration per channel, and focused scorer/orchestration tests without ML or automatic tuning.
