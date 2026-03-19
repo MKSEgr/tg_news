@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 	"time"
@@ -15,7 +14,7 @@ import (
 
 const (
 	defaultRecentItemsLimit = 50
-	defaultExistingLimit    = math.MaxInt32
+	defaultExistingLimit    = 200
 	defaultRepostLimit      = 1
 	defaultRepostThreshold  = 1.0
 	defaultRepostCooldown   = 72 * time.Hour
@@ -24,6 +23,20 @@ const (
 // CollectorJob runs content collection.
 type CollectorJob struct {
 	collector collectorRunner
+}
+
+// WithBatchLimits sets explicit runtime bounds for source-item and draft-history scans.
+func (j *PipelineJob) WithBatchLimits(recentItemsLimit int, existingDraftLimit int) *PipelineJob {
+	if j == nil {
+		return nil
+	}
+	if recentItemsLimit > 0 {
+		j.recentItemsLimit = recentItemsLimit
+	}
+	if existingDraftLimit > 0 {
+		j.existingDraftLimit = existingDraftLimit
+	}
+	return j
 }
 
 // PipelineJob orchestrates draft generation from recently collected source items.
@@ -45,6 +58,8 @@ type PipelineJob struct {
 	planner            editorialPlanner
 	assetGenerator     intentAssetGenerator
 	clusterObserver    storyClusterObserver
+	plannerErrorHook   func(item domain.SourceItem, err error)
+	assetErrorHook     func(intent domain.PublishIntent, err error)
 	clusterErrorHook   func(item domain.SourceItem, err error)
 	recentItemsLimit   int
 	existingDraftLimit int
@@ -382,6 +397,24 @@ func (j *PipelineJob) WithIntentAssetGenerator(generator intentAssetGenerator) *
 	return j
 }
 
+// WithPlannerErrorHook sets an optional non-blocking hook for planner failures.
+func (j *PipelineJob) WithPlannerErrorHook(hook func(item domain.SourceItem, err error)) *PipelineJob {
+	if j == nil {
+		return nil
+	}
+	j.plannerErrorHook = hook
+	return j
+}
+
+// WithAssetErrorHook sets an optional non-blocking hook for asset generation failures.
+func (j *PipelineJob) WithAssetErrorHook(hook func(intent domain.PublishIntent, err error)) *PipelineJob {
+	if j == nil {
+		return nil
+	}
+	j.assetErrorHook = hook
+	return j
+}
+
 // WithStoryClusterObserver sets optional story cluster observation for routing/generation context.
 func (j *PipelineJob) WithStoryClusterObserver(observer storyClusterObserver) *PipelineJob {
 	if j == nil {
@@ -505,10 +538,19 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 
 			intents := []domain.PublishIntent(nil)
 			if j.planner != nil {
+				var plannerErr error
 				if routedPlanner, ok := j.planner.(routedEditorialPlanner); ok {
-					intents, _ = routedPlanner.PlanForSourceItemForChannels(ctx, normalized, allowedTargetIDs)
+					intents, plannerErr = routedPlanner.PlanForSourceItemForChannels(ctx, normalized, allowedTargetIDs)
 				} else {
-					intents, _ = j.planner.PlanForSourceItem(ctx, normalized)
+					intents, plannerErr = j.planner.PlanForSourceItem(ctx, normalized)
+				}
+				if plannerErr != nil {
+					if j.plannerErrorHook != nil {
+						j.plannerErrorHook(normalized, plannerErr)
+					} else {
+						return fmt.Errorf("plan item %d: %w", normalized.ID, plannerErr)
+					}
+					intents = nil
 				}
 				if j.assetGenerator != nil {
 					allowedIntentChannels := make(map[int64]struct{}, len(allowedTargetIDs))
@@ -519,7 +561,13 @@ func (j *PipelineJob) Run(ctx context.Context) error {
 						if _, ok := allowedIntentChannels[intent.ChannelID]; !ok {
 							continue
 						}
-						_, _ = j.assetGenerator.GenerateFromIntent(ctx, intent)
+						if _, assetErr := j.assetGenerator.GenerateFromIntent(ctx, intent); assetErr != nil {
+							if j.assetErrorHook != nil {
+								j.assetErrorHook(intent, assetErr)
+							} else {
+								return fmt.Errorf("generate asset for intent %d: %w", intent.ID, assetErr)
+							}
+						}
 					}
 				}
 			}

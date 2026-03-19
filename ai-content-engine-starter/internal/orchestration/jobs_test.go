@@ -120,6 +120,20 @@ func (s *draftRepoStub) UpdateStatus(_ context.Context, id int64, status domain.
 	return nil
 }
 
+func (s *draftRepoStub) UpdateStatusIfCurrent(_ context.Context, id int64, current domain.DraftStatus, next domain.DraftStatus) (bool, error) {
+	if s.updateErr != nil {
+		return false, s.updateErr
+	}
+	if s.updated == nil {
+		s.updated = make(map[int64]domain.DraftStatus)
+	}
+	if status, ok := s.updated[id]; ok && status != current {
+		return false, nil
+	}
+	s.updated[id] = next
+	return true, nil
+}
+
 type normalizerStub struct{ item domain.SourceItem }
 
 func (n *normalizerStub) Normalize(domain.SourceItem) (domain.SourceItem, error) { return n.item, nil }
@@ -848,7 +862,7 @@ func TestPipelineJobRunWithPlannerEnabledStillCreatesDraft(t *testing.T) {
 	}
 }
 
-func TestPipelineJobRunIgnoresPlannerError(t *testing.T) {
+func TestPipelineJobRunReportsPlannerErrorViaHook(t *testing.T) {
 	planner := &plannerStub{err: errors.New("planner failed")}
 	job, err := NewPipelineJob(
 		&sourceRepoStub{sources: []domain.Source{{ID: 1, Enabled: true}}},
@@ -868,7 +882,8 @@ func TestPipelineJobRunIgnoresPlannerError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewPipelineJob() error = %v", err)
 	}
-	job = job.WithEditorialPlanner(planner)
+	plannerHookCalls := 0
+	job = job.WithEditorialPlanner(planner).WithPlannerErrorHook(func(domain.SourceItem, error) { plannerHookCalls++ })
 
 	if err := job.Run(context.Background()); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -877,6 +892,9 @@ func TestPipelineJobRunIgnoresPlannerError(t *testing.T) {
 	drafts := job.drafts.(*draftRepoStub)
 	if planner.calls != 1 {
 		t.Fatalf("planner calls = %d, want 1", planner.calls)
+	}
+	if plannerHookCalls != 1 {
+		t.Fatalf("plannerHookCalls = %d, want 1", plannerHookCalls)
 	}
 	if len(drafts.created) != 1 {
 		t.Fatalf("created drafts = %d, want 1", len(drafts.created))
@@ -951,7 +969,7 @@ func TestPipelineJobRunGeneratesAssetsFromPlannedIntents(t *testing.T) {
 	}
 }
 
-func TestPipelineJobRunIgnoresAssetGenerationError(t *testing.T) {
+func TestPipelineJobRunReportsAssetGenerationErrorViaHook(t *testing.T) {
 	assetGen := &assetGeneratorStub{err: errors.New("asset gen failed")}
 	job, err := NewPipelineJob(
 		&sourceRepoStub{sources: []domain.Source{{ID: 1, Enabled: true}}},
@@ -971,15 +989,19 @@ func TestPipelineJobRunIgnoresAssetGenerationError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewPipelineJob() error = %v", err)
 	}
+	assetHookCalls := 0
 	job = job.WithEditorialPlanner(plannerFunc(func(context.Context, domain.SourceItem) ([]domain.PublishIntent, error) {
 		return []domain.PublishIntent{{RawItemID: 10, ChannelID: 1, Format: "text", Status: domain.PublishIntentStatusPlanned}}, nil
-	})).WithIntentAssetGenerator(assetGen)
+	})).WithIntentAssetGenerator(assetGen).WithAssetErrorHook(func(domain.PublishIntent, error) { assetHookCalls++ })
 
 	if err := job.Run(context.Background()); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if assetGen.calls != 1 {
 		t.Fatalf("assetGen calls = %d, want 1", assetGen.calls)
+	}
+	if assetHookCalls != 1 {
+		t.Fatalf("assetHookCalls = %d, want 1", assetHookCalls)
 	}
 }
 
@@ -1615,7 +1637,7 @@ func TestNewPipelineJobValidation(t *testing.T) {
 	}
 }
 
-func TestNewPipelineJobUsesUnboundedDraftScanLimit(t *testing.T) {
+func TestNewPipelineJobUsesBoundedDraftScanLimit(t *testing.T) {
 	job, err := NewPipelineJob(
 		&sourceRepoStub{},
 		&sourceItemRepoStub{},
@@ -1636,6 +1658,34 @@ func TestNewPipelineJobUsesUnboundedDraftScanLimit(t *testing.T) {
 	}
 	if job.existingDraftLimit != defaultExistingLimit {
 		t.Fatalf("existingDraftLimit = %d, want %d", job.existingDraftLimit, defaultExistingLimit)
+	}
+}
+
+func TestPipelineJobWithBatchLimitsOverridesDefaults(t *testing.T) {
+	job, err := NewPipelineJob(
+		&sourceRepoStub{},
+		&sourceItemRepoStub{},
+		&channelRepoStub{},
+		&draftRepoStub{byStatus: map[domain.DraftStatus][]domain.Draft{}},
+		&normalizerStub{},
+		&dedupStub{},
+		&scorerStub{},
+		&routerStub{},
+		&generatorStub{},
+		&guardStub{},
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewPipelineJob() error = %v", err)
+	}
+	job.WithBatchLimits(12, 34)
+	if job.recentItemsLimit != 12 {
+		t.Fatalf("recentItemsLimit = %d, want 12", job.recentItemsLimit)
+	}
+	if job.existingDraftLimit != 34 {
+		t.Fatalf("existingDraftLimit = %d, want 34", job.existingDraftLimit)
 	}
 }
 

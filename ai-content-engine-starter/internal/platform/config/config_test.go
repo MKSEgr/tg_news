@@ -125,3 +125,44 @@ func TestLoadWhitespaceRedisAddr(t *testing.T) {
 		t.Fatalf("Load() expected error when REDIS_ADDR is whitespace")
 	}
 }
+
+func TestLoadRuntimeLoopConfig(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "postgres://localhost:5432/app")
+	t.Setenv("REDIS_ADDR", "localhost:6379")
+	t.Setenv("ENABLE_PIPELINE", "true")
+	t.Setenv("ENABLE_PUBLISHER", "true")
+	t.Setenv("LOOP_INTERVAL", "30s")
+	t.Setenv("YANDEX_AI_API_KEY", "key")
+	t.Setenv("YANDEX_AI_MODEL_URI", "model")
+	t.Setenv("TELEGRAM_BOT_TOKEN", "bot")
+	t.Setenv("CHANNEL_CHAT_MAP", "ai-news=@ai_news,ai-tools=-1002")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() returned error: %v", err)
+	}
+	if !cfg.EnablePipeline || !cfg.EnablePublisher {
+		t.Fatalf("expected runtime flags to be enabled")
+	}
+	if cfg.LoopInterval.String() != "30s" {
+		t.Fatalf("LoopInterval = %s, want 30s", cfg.LoopInterval)
+	}
+	if cfg.ChannelChatMap["ai-news"] != "@ai_news" || cfg.ChannelChatMap["ai-tools"] != "-1002" {
+		t.Fatalf("unexpected ChannelChatMap: %#v", cfg.ChannelChatMap)
+	}
+}
+
+func TestLoadRuntimeFlagsRequireCredentials(t *testing.T) {
+	t.Setenv("POSTGRES_DSN", "postgres://localhost:5432/app")
+	t.Setenv("REDIS_ADDR", "localhost:6379")
+	t.Setenv("ENABLE_PIPELINE", "true")
+	if _, err := Load(); err == nil {
+		t.Fatalf("expected pipeline credential error")
+	}
+
+	t.Setenv("ENABLE_PIPELINE", "false")
+	t.Setenv("ENABLE_PUBLISHER", "true")
+	if _, err := Load(); err == nil {
+		t.Fatalf("expected publisher credential error")
+	}
+}

@@ -9,6 +9,9 @@ func TestDraftStatusesAreStable(t *testing.T) {
 	if DraftStatusApproved != "approved" {
 		t.Fatalf("DraftStatusApproved = %q, want %q", DraftStatusApproved, "approved")
 	}
+	if DraftStatusPublishing != "publishing" {
+		t.Fatalf("DraftStatusPublishing = %q, want %q", DraftStatusPublishing, "publishing")
+	}
 	if DraftStatusRejected != "rejected" {
 		t.Fatalf("DraftStatusRejected = %q, want %q", DraftStatusRejected, "rejected")
 	}

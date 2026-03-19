@@ -45,6 +45,15 @@ func (s *draftRepoStub) UpdateStatus(_ context.Context, id int64, status domain.
 	return s.updateErr
 }
 
+func (s *draftRepoStub) UpdateStatusIfCurrent(_ context.Context, id int64, current domain.DraftStatus, next domain.DraftStatus) (bool, error) {
+	if s.updateErr != nil {
+		return false, s.updateErr
+	}
+	s.lastUpdatedID = id
+	s.lastUpdatedStatus = next
+	return true, nil
+}
+
 func TestNewHandlerValidation(t *testing.T) {
 	if _, err := NewHandler(nil); err == nil {
 		t.Fatalf("expected error for nil repository")

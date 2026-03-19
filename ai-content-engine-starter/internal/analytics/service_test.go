@@ -28,6 +28,9 @@ func (s *draftRepoStub) ListByStatus(_ context.Context, status domain.DraftStatu
 	return s.byStatus[status], nil
 }
 func (s *draftRepoStub) UpdateStatus(context.Context, int64, domain.DraftStatus) error { return nil }
+func (s *draftRepoStub) UpdateStatusIfCurrent(context.Context, int64, domain.DraftStatus, domain.DraftStatus) (bool, error) {
+	return true, nil
+}
 
 type feedbackRepoStub struct {
 	byDraft map[int64]domain.PerformanceFeedback

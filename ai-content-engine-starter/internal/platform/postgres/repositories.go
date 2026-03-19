@@ -543,6 +543,23 @@ func (r *DraftRepository) UpdateStatus(ctx context.Context, id int64, status dom
 	return nil
 }
 
+func (r *DraftRepository) UpdateStatusIfCurrent(ctx context.Context, id int64, current domain.DraftStatus, next domain.DraftStatus) (bool, error) {
+	if err := ensureDB(r.db); err != nil {
+		return false, err
+	}
+
+	const q = `UPDATE drafts SET status = $1, updated_at = NOW() WHERE id = $2 AND status = $3`
+	result, err := r.db.ExecContext(ctx, q, next, id, current)
+	if err != nil {
+		return false, fmt.Errorf("update draft status conditionally: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("conditional draft status rows affected: %w", err)
+	}
+	return rowsAffected > 0, nil
+}
+
 func (r *PublishIntentRepository) Create(ctx context.Context, intent domain.PublishIntent) (domain.PublishIntent, error) {
 	if err := ensureDB(r.db); err != nil {
 		return domain.PublishIntent{}, err

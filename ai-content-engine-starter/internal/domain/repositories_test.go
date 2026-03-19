@@ -52,6 +52,9 @@ func (stubDraftRepo) ListByStatus(context.Context, DraftStatus, int) ([]Draft, e
 	return nil, nil
 }
 func (stubDraftRepo) UpdateStatus(context.Context, int64, DraftStatus) error { return nil }
+func (stubDraftRepo) UpdateStatusIfCurrent(context.Context, int64, DraftStatus, DraftStatus) (bool, error) {
+	return true, nil
+}
 
 type stubContentAssetRepo struct{}
 

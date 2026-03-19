@@ -43,6 +43,7 @@ type DraftRepository interface {
 	GetByID(ctx context.Context, id int64) (Draft, error)
 	ListByStatus(ctx context.Context, status DraftStatus, limit int) ([]Draft, error)
 	UpdateStatus(ctx context.Context, id int64, status DraftStatus) error
+	UpdateStatusIfCurrent(ctx context.Context, id int64, current DraftStatus, next DraftStatus) (bool, error)
 }
 
 // PublishIntentRepository defines persistence operations for editorial planner intents.

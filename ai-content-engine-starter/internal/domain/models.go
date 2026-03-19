@@ -58,10 +58,11 @@ type SourceItem struct {
 type DraftStatus string
 
 const (
-	DraftStatusPending  DraftStatus = "pending"
-	DraftStatusApproved DraftStatus = "approved"
-	DraftStatusRejected DraftStatus = "rejected"
-	DraftStatusPosted   DraftStatus = "posted"
+	DraftStatusPending    DraftStatus = "pending"
+	DraftStatusApproved   DraftStatus = "approved"
+	DraftStatusPublishing DraftStatus = "publishing"
+	DraftStatusRejected   DraftStatus = "rejected"
+	DraftStatusPosted     DraftStatus = "posted"
 )
 
 // Draft is a channel-targeted generated post draft.

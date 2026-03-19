@@ -3,6 +3,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"errors"
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -164,6 +167,86 @@ func TestListByStatusRejectsInvalidLimit(t *testing.T) {
 	if err == nil {
 		t.Fatalf("ListByStatus expected error for invalid limit")
 	}
+}
+
+func TestDraftRepositoryUpdateStatusIfCurrent(t *testing.T) {
+	db := openExecStubDB(t, func(query string, args []driver.NamedValue) (driver.Result, error) {
+		if query != "UPDATE drafts SET status = $1, updated_at = NOW() WHERE id = $2 AND status = $3" {
+			return nil, fmt.Errorf("unexpected query: %s", query)
+		}
+		if len(args) != 3 || args[0].Value != string(domain.DraftStatusPublishing) || args[1].Value != int64(7) || args[2].Value != string(domain.DraftStatusApproved) {
+			return nil, fmt.Errorf("unexpected args: %#v", args)
+		}
+		return driver.RowsAffected(1), nil
+	})
+	defer db.Close()
+
+	repo := NewDraftRepository(db)
+	ok, err := repo.UpdateStatusIfCurrent(context.Background(), 7, domain.DraftStatusApproved, domain.DraftStatusPublishing)
+	if err != nil {
+		t.Fatalf("UpdateStatusIfCurrent() error = %v", err)
+	}
+	if !ok {
+		t.Fatalf("UpdateStatusIfCurrent() = false, want true")
+	}
+}
+
+func TestDraftRepositoryUpdateStatusIfCurrentReturnsFalseWhenNoRowsChange(t *testing.T) {
+	db := openExecStubDB(t, func(query string, args []driver.NamedValue) (driver.Result, error) {
+		if query != "UPDATE drafts SET status = $1, updated_at = NOW() WHERE id = $2 AND status = $3" {
+			return nil, fmt.Errorf("unexpected query: %s", query)
+		}
+		return driver.RowsAffected(0), nil
+	})
+	defer db.Close()
+
+	repo := NewDraftRepository(db)
+	ok, err := repo.UpdateStatusIfCurrent(context.Background(), 7, domain.DraftStatusApproved, domain.DraftStatusPublishing)
+	if err != nil {
+		t.Fatalf("UpdateStatusIfCurrent() error = %v", err)
+	}
+	if ok {
+		t.Fatalf("UpdateStatusIfCurrent() = true, want false")
+	}
+}
+
+type execStubDriver struct {
+	execFunc func(query string, args []driver.NamedValue) (driver.Result, error)
+}
+
+func (d *execStubDriver) Open(string) (driver.Conn, error) {
+	return &execStubConn{execFunc: d.execFunc}, nil
+}
+
+type execStubConn struct {
+	execFunc func(query string, args []driver.NamedValue) (driver.Result, error)
+}
+
+func (c *execStubConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("not implemented")
+}
+func (c *execStubConn) Close() error              { return nil }
+func (c *execStubConn) Begin() (driver.Tx, error) { return nil, errors.New("not implemented") }
+func (c *execStubConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	if c.execFunc == nil {
+		return nil, fmt.Errorf("unexpected query: %s", query)
+	}
+	return c.execFunc(query, args)
+}
+func (c *execStubConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	return nil, errors.New("not implemented")
+}
+func (c *execStubConn) Ping(context.Context) error { return nil }
+
+func openExecStubDB(t *testing.T, execFunc func(query string, args []driver.NamedValue) (driver.Result, error)) *sql.DB {
+	t.Helper()
+	name := fmt.Sprintf("execstub-%d", time.Now().UnixNano())
+	sql.Register(name, &execStubDriver{execFunc: execFunc})
+	db, err := sql.Open(name, "")
+	if err != nil {
+		t.Fatalf("sql.Open() error = %v", err)
+	}
+	return db
 }
 
 func TestRepositoryRejectsNilDB(t *testing.T) {

@@ -38,6 +38,15 @@ func (s *draftRepoStub) UpdateStatus(_ context.Context, id int64, status domain.
 	return nil
 }
 
+func (s *draftRepoStub) UpdateStatusIfCurrent(_ context.Context, id int64, current domain.DraftStatus, next domain.DraftStatus) (bool, error) {
+	if s.updateErr != nil {
+		return false, s.updateErr
+	}
+	s.lastUpdateID = id
+	s.lastStatus = next
+	return true, nil
+}
+
 func TestNewValidation(t *testing.T) {
 	if _, err := New(nil, []int64{1}); err == nil {
 		t.Fatalf("expected nil drafts error")
