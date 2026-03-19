@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS story_clusters (
+    id BIGSERIAL PRIMARY KEY,
+    cluster_key TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
