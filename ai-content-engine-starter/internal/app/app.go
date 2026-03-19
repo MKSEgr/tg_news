@@ -58,6 +58,7 @@ type App struct {
 	stats       *runtimeStats
 	statusCheck func(context.Context) error
 	openDB      func(driverName, dsn string) (*sql.DB, error)
+	migrateDB   func(context.Context, *sql.DB) error
 	pingRedisFn func(context.Context, string) error
 }
 
@@ -114,6 +115,7 @@ func New() (*App, error) {
 		stats:       &runtimeStats{},
 		drafts:      adminFallbackDraftRepository{},
 		openDB:      sql.Open,
+		migrateDB:   applyStartupMigrations,
 		pingRedisFn: pingRedis,
 	}
 	if err := app.initRuntime(context.Background()); err != nil {
@@ -141,6 +143,9 @@ func (a *App) initRuntime(ctx context.Context) error {
 	if a.openDB == nil {
 		a.openDB = sql.Open
 	}
+	if a.migrateDB == nil {
+		a.migrateDB = applyStartupMigrations
+	}
 	if a.pingRedisFn == nil {
 		a.pingRedisFn = pingRedis
 	}
@@ -157,6 +162,11 @@ func (a *App) initRuntime(ctx context.Context) error {
 		return fmt.Errorf("ping redis: %w", err)
 	}
 	a.db = db
+	if err := a.migrateDB(ctx, a.db); err != nil {
+		_ = a.db.Close()
+		a.db = nil
+		return fmt.Errorf("apply postgres migrations: %w", err)
+	}
 	if !a.cfg.EnablePipeline && !a.cfg.EnablePublisher {
 		drafts, err := newAdminFileDraftRepository(filepath.Join(os.TempDir(), "ai-content-engine-starter-admin-drafts.json"))
 		if err != nil {
