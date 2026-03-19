@@ -20,6 +20,7 @@ import (
 	"ai-content-engine-starter/internal/platform/config"
 	"ai-content-engine-starter/internal/platform/postgres"
 	"ai-content-engine-starter/internal/scheduler"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func TestHealthHandler(t *testing.T) {
@@ -295,7 +296,7 @@ func TestInitRuntimeUsesPostgresRepositories(t *testing.T) {
 }
 
 func TestPostgresDriverIsRegistered(t *testing.T) {
-	db, err := sql.Open("postgres", "postgres://user:pass@127.0.0.1:1/testdb?sslmode=disable&connect_timeout=1")
+	db, err := sql.Open("pgx", "postgres://user:pass@127.0.0.1:1/testdb?sslmode=disable&connect_timeout=1")
 	if err != nil {
 		t.Fatalf("sql.Open() error = %v", err)
 	}

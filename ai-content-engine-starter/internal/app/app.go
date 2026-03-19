@@ -43,7 +43,7 @@ import (
 	"ai-content-engine-starter/internal/scorer"
 	"ai-content-engine-starter/internal/seed"
 	"ai-content-engine-starter/internal/webui"
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -144,7 +144,7 @@ func (a *App) initRuntime(ctx context.Context) error {
 	if a.pingRedisFn == nil {
 		a.pingRedisFn = pingRedis
 	}
-	db, err := a.openDB("postgres", a.cfg.PostgresDSN)
+	db, err := a.openDB("pgx", a.cfg.PostgresDSN)
 	if err != nil {
 		return fmt.Errorf("open postgres: %w", err)
 	}
