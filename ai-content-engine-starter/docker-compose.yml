@@ -9,19 +9,22 @@ services:
     environment:
       APP_ENV: development
       HTTP_PORT: 8080
-      POSTGRES_DSN: postgres://postgres:postgres@postgres:5432/app?sslmode=disable
-      REDIS_ADDR: redis:6379
+      POSTGRES_DSN: ${POSTGRES_DSN:-postgres://postgres:postgres@host.docker.internal:5432/app?sslmode=disable}
+      REDIS_ADDR: ${REDIS_ADDR:-host.docker.internal:6379}
+      ENABLE_PIPELINE: ${ENABLE_PIPELINE:-false}
+      ENABLE_PUBLISHER: ${ENABLE_PUBLISHER:-false}
+      LOOP_INTERVAL: ${LOOP_INTERVAL:-30s}
+      FEATURE_V2_ENABLED: ${FEATURE_V2_ENABLED:-true}
+      FEATURE_WEB_UI: ${FEATURE_WEB_UI:-true}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./:/app
     ports:
       - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
 
   postgres:
+    profiles: ["infra"]
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -39,6 +42,7 @@ services:
       retries: 10
 
   redis:
+    profiles: ["infra"]
     image: redis:7-alpine
     restart: unless-stopped
     ports:

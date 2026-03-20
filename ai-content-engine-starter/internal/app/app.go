@@ -43,7 +43,7 @@ import (
 	"ai-content-engine-starter/internal/scorer"
 	"ai-content-engine-starter/internal/seed"
 	"ai-content-engine-starter/internal/webui"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/lib/pq"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -58,7 +58,6 @@ type App struct {
 	stats       *runtimeStats
 	statusCheck func(context.Context) error
 	openDB      func(driverName, dsn string) (*sql.DB, error)
-	migrateDB   func(context.Context, *sql.DB) error
 	pingRedisFn func(context.Context, string) error
 }
 
@@ -115,7 +114,6 @@ func New() (*App, error) {
 		stats:       &runtimeStats{},
 		drafts:      adminFallbackDraftRepository{},
 		openDB:      sql.Open,
-		migrateDB:   applyStartupMigrations,
 		pingRedisFn: pingRedis,
 	}
 	if err := app.initRuntime(context.Background()); err != nil {
@@ -143,13 +141,10 @@ func (a *App) initRuntime(ctx context.Context) error {
 	if a.openDB == nil {
 		a.openDB = sql.Open
 	}
-	if a.migrateDB == nil {
-		a.migrateDB = applyStartupMigrations
-	}
 	if a.pingRedisFn == nil {
 		a.pingRedisFn = pingRedis
 	}
-	db, err := a.openDB("pgx", a.cfg.PostgresDSN)
+	db, err := a.openDB("postgres", a.cfg.PostgresDSN)
 	if err != nil {
 		return fmt.Errorf("open postgres: %w", err)
 	}
@@ -162,11 +157,6 @@ func (a *App) initRuntime(ctx context.Context) error {
 		return fmt.Errorf("ping redis: %w", err)
 	}
 	a.db = db
-	if err := a.migrateDB(ctx, a.db); err != nil {
-		_ = a.db.Close()
-		a.db = nil
-		return fmt.Errorf("apply postgres migrations: %w", err)
-	}
 	if !a.cfg.EnablePipeline && !a.cfg.EnablePublisher {
 		drafts, err := newAdminFileDraftRepository(filepath.Join(os.TempDir(), "ai-content-engine-starter-admin-drafts.json"))
 		if err != nil {

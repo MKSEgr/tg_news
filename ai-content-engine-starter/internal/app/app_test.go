@@ -13,16 +13,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
-	dbmigrations "ai-content-engine-starter/db/migrations"
 	"ai-content-engine-starter/internal/domain"
 	"ai-content-engine-starter/internal/platform/config"
 	"ai-content-engine-starter/internal/platform/postgres"
 	"ai-content-engine-starter/internal/scheduler"
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func TestHealthHandler(t *testing.T) {
@@ -283,7 +280,6 @@ func TestInitRuntimeUsesPostgresRepositories(t *testing.T) {
 		logger:      loggerForTest(),
 		stats:       &runtimeStats{},
 		openDB:      func(string, string) (*sql.DB, error) { return db, nil },
-		migrateDB:   func(context.Context, *sql.DB) error { return nil },
 		pingRedisFn: func(context.Context, string) error { return nil },
 		drafts:      adminFallbackDraftRepository{},
 	}
@@ -298,137 +294,8 @@ func TestInitRuntimeUsesPostgresRepositories(t *testing.T) {
 	}
 }
 
-func TestInitRuntimeAppliesMigrationsBeforeSeed(t *testing.T) {
-	steps := make([]string, 0, 4)
-	db := openStubDB(t, &stubDBHandler{
-		pingFunc: func(context.Context) error {
-			steps = append(steps, "ping-db")
-			return nil
-		},
-		queryFunc: func(query string, args []driver.NamedValue) (driver.Rows, error) {
-			switch query {
-			case "SELECT id, slug, name, created_at FROM channels ORDER BY id":
-				steps = append(steps, "seed-query-channels")
-				return &stubRows{columns: []string{"id", "slug", "name", "created_at"}, values: [][]driver.Value{{int64(1), "ai-news", "AI News", time.Now().UTC()}}}, nil
-			case "SELECT id, kind, name, endpoint, enabled, created_at FROM sources ORDER BY id":
-				steps = append(steps, "seed-query-sources")
-				return &stubRows{columns: []string{"id", "kind", "name", "endpoint", "enabled", "created_at"}, values: [][]driver.Value{{int64(1), "rss", "AI News RSS", "https://example.com/ai-news.rss", false, time.Now().UTC()}}}, nil
-			default:
-				return nil, fmt.Errorf("unexpected query: %s", query)
-			}
-		},
-	})
-	defer db.Close()
-
-	a := &App{
-		cfg: config.Config{
-			PostgresDSN:      "postgres://user:pass@localhost/testdb?sslmode=disable",
-			RedisAddr:        "127.0.0.1:6379",
-			EnablePublisher:  true,
-			TelegramBotToken: "token",
-			LoopInterval:     time.Second,
-		},
-		logger: loggerForTest(),
-		stats:  &runtimeStats{},
-		openDB: func(string, string) (*sql.DB, error) { return db, nil },
-		migrateDB: func(context.Context, *sql.DB) error {
-			steps = append(steps, "migrate")
-			return nil
-		},
-		pingRedisFn: func(context.Context, string) error {
-			steps = append(steps, "ping-redis")
-			return nil
-		},
-		drafts: adminFallbackDraftRepository{},
-	}
-	if err := a.initRuntime(context.Background()); err != nil {
-		t.Fatalf("initRuntime() error = %v", err)
-	}
-	want := []string{"ping-db", "ping-redis", "migrate", "seed-query-channels"}
-	for i, step := range want {
-		if i >= len(steps) || steps[i] != step {
-			t.Fatalf("steps[%d] = %q, want prefix %v (got %v)", i, valueAt(steps, i), want, steps)
-		}
-	}
-}
-
-func TestApplyStartupMigrationsFreshDatabaseAppliesAllFiles(t *testing.T) {
-	files, err := dbmigrations.UpFileNames()
-	if err != nil {
-		t.Fatalf("UpFileNames() error = %v", err)
-	}
-	var executed []string
-	db := openStubDB(t, &stubDBHandler{
-		queryFunc: func(query string, args []driver.NamedValue) (driver.Rows, error) {
-			if query != "SELECT version FROM schema_migrations ORDER BY version" {
-				return nil, fmt.Errorf("unexpected query: %s", query)
-			}
-			return &stubRows{columns: []string{"version"}}, nil
-		},
-		execFunc: func(query string, args []driver.NamedValue) (driver.Result, error) {
-			executed = append(executed, strings.TrimSpace(query))
-			return driver.RowsAffected(1), nil
-		},
-	})
-	defer db.Close()
-
-	if err := applyStartupMigrations(context.Background(), db); err != nil {
-		t.Fatalf("applyStartupMigrations() error = %v", err)
-	}
-	if len(executed) != 1+len(files)*2 {
-		t.Fatalf("executed statements = %d, want %d", len(executed), 1+len(files)*2)
-	}
-	if !strings.Contains(executed[0], "CREATE TABLE IF NOT EXISTS schema_migrations") {
-		t.Fatalf("first statement = %q, want schema_migrations creation", executed[0])
-	}
-	recorded := 0
-	for _, statement := range executed {
-		if strings.Contains(statement, "INSERT INTO schema_migrations(version) VALUES ($1)") {
-			recorded++
-		}
-	}
-	if recorded != len(files) {
-		t.Fatalf("recorded migrations = %d, want %d", recorded, len(files))
-	}
-}
-
-func TestApplyStartupMigrationsAlreadyMigratedSkipsReapplying(t *testing.T) {
-	files, err := dbmigrations.UpFileNames()
-	if err != nil {
-		t.Fatalf("UpFileNames() error = %v", err)
-	}
-	values := make([][]driver.Value, 0, len(files))
-	for _, name := range files {
-		values = append(values, []driver.Value{name})
-	}
-	var executed []string
-	db := openStubDB(t, &stubDBHandler{
-		queryFunc: func(query string, args []driver.NamedValue) (driver.Rows, error) {
-			if query != "SELECT version FROM schema_migrations ORDER BY version" {
-				return nil, fmt.Errorf("unexpected query: %s", query)
-			}
-			return &stubRows{columns: []string{"version"}, values: values}, nil
-		},
-		execFunc: func(query string, args []driver.NamedValue) (driver.Result, error) {
-			executed = append(executed, strings.TrimSpace(query))
-			return driver.RowsAffected(1), nil
-		},
-	})
-	defer db.Close()
-
-	if err := applyStartupMigrations(context.Background(), db); err != nil {
-		t.Fatalf("applyStartupMigrations() error = %v", err)
-	}
-	if len(executed) != 1 {
-		t.Fatalf("executed statements = %d, want 1", len(executed))
-	}
-	if !strings.Contains(executed[0], "CREATE TABLE IF NOT EXISTS schema_migrations") {
-		t.Fatalf("first statement = %q, want schema_migrations creation", executed[0])
-	}
-}
-
 func TestPostgresDriverIsRegistered(t *testing.T) {
-	db, err := sql.Open("pgx", "postgres://user:pass@127.0.0.1:1/testdb?sslmode=disable&connect_timeout=1")
+	db, err := sql.Open("postgres", "postgres://user:pass@127.0.0.1:1/testdb?sslmode=disable&connect_timeout=1")
 	if err != nil {
 		t.Fatalf("sql.Open() error = %v", err)
 	}
@@ -498,10 +365,7 @@ type stubConn struct{ handler *stubDBHandler }
 
 func (c *stubConn) Prepare(string) (driver.Stmt, error) { return nil, errors.New("not implemented") }
 func (c *stubConn) Close() error                        { return nil }
-func (c *stubConn) Begin() (driver.Tx, error)           { return stubTx{}, nil }
-func (c *stubConn) BeginTx(context.Context, driver.TxOptions) (driver.Tx, error) {
-	return stubTx{}, nil
-}
+func (c *stubConn) Begin() (driver.Tx, error)           { return nil, errors.New("not implemented") }
 func (c *stubConn) Ping(ctx context.Context) error {
 	if c.handler != nil && c.handler.pingFunc != nil {
 		return c.handler.pingFunc(ctx)
@@ -527,13 +391,6 @@ type stubRows struct {
 	index   int
 }
 
-type stubTx struct{}
-
-var stubDriverCounter atomic.Uint64
-
-func (stubTx) Commit() error   { return nil }
-func (stubTx) Rollback() error { return nil }
-
 func (r *stubRows) Columns() []string { return r.columns }
 func (r *stubRows) Close() error      { return nil }
 func (r *stubRows) Next(dest []driver.Value) error {
@@ -547,7 +404,7 @@ func (r *stubRows) Next(dest []driver.Value) error {
 
 func openStubDB(t *testing.T, handler *stubDBHandler) *sql.DB {
 	t.Helper()
-	name := fmt.Sprintf("stubdb-%d", stubDriverCounter.Add(1))
+	name := fmt.Sprintf("stubdb-%d", time.Now().UnixNano())
 	sql.Register(name, &stubDriver{handler: handler})
 	db, err := sql.Open(name, "")
 	if err != nil {
@@ -558,13 +415,6 @@ func openStubDB(t *testing.T, handler *stubDBHandler) *sql.DB {
 
 func contains(value string, needle string) bool {
 	return strings.Contains(value, needle)
-}
-
-func valueAt(values []string, idx int) string {
-	if idx < 0 || idx >= len(values) {
-		return ""
-	}
-	return values[idx]
 }
 
 type publisherClientFunc func(context.Context, domain.Draft, string) (int64, error)

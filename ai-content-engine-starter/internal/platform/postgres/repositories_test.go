@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -223,8 +222,6 @@ type execStubConn struct {
 	execFunc func(query string, args []driver.NamedValue) (driver.Result, error)
 }
 
-var execStubDriverCounter atomic.Uint64
-
 func (c *execStubConn) Prepare(string) (driver.Stmt, error) {
 	return nil, errors.New("not implemented")
 }
@@ -243,7 +240,7 @@ func (c *execStubConn) Ping(context.Context) error { return nil }
 
 func openExecStubDB(t *testing.T, execFunc func(query string, args []driver.NamedValue) (driver.Result, error)) *sql.DB {
 	t.Helper()
-	name := fmt.Sprintf("execstub-%d", execStubDriverCounter.Add(1))
+	name := fmt.Sprintf("execstub-%d", time.Now().UnixNano())
 	sql.Register(name, &execStubDriver{execFunc: execFunc})
 	db, err := sql.Open(name, "")
 	if err != nil {
