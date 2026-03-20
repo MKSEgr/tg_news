@@ -1,0 +1,8 @@
+BEGIN;
+
+DROP TABLE IF EXISTS drafts;
+DROP TABLE IF EXISTS source_items;
+DROP TABLE IF EXISTS sources;
+DROP TABLE IF EXISTS channels;
+
+COMMIT;

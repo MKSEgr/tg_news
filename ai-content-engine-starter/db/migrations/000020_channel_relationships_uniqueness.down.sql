@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_channel_relationships_unique_link;

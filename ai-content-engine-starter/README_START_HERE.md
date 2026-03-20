@@ -10,6 +10,10 @@ This starter pack contains:
 - reusable prompts for Cursor/Codex
 - agent role notes
 
+## Local run
+
+For Docker-based local startup guidance (including the case where PostgreSQL and Redis are already running in other containers on your machine), see `docs/local_development.md`. The repository also keeps the runnable local stack definition in `docker-compose.yml`, so both files should remain committed alongside the project sources.
+
 ## Recommended workflow
 
 1. Copy these files into the root of your repository.

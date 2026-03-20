@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  app:
+    image: golang:1.22
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "go run ./cmd/app"
+    environment:
+      APP_ENV: development
+      HTTP_PORT: 8080
+      POSTGRES_DSN: ${POSTGRES_DSN:-postgres://postgres:postgres@host.docker.internal:5432/app?sslmode=disable}
+      REDIS_ADDR: ${REDIS_ADDR:-host.docker.internal:6379}
+      ENABLE_PIPELINE: ${ENABLE_PIPELINE:-false}
+      ENABLE_PUBLISHER: ${ENABLE_PUBLISHER:-false}
+      LOOP_INTERVAL: ${LOOP_INTERVAL:-30s}
+      FEATURE_V2_ENABLED: ${FEATURE_V2_ENABLED:-true}
+      FEATURE_WEB_UI: ${FEATURE_WEB_UI:-true}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./:/app
+    ports:
+      - "8080:8080"
+
+  postgres:
+    profiles: ["infra"]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    profiles: ["infra"]
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
